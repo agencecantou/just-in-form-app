@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #201418;
+
+  /* Just In Form : identite de marque */
+  --color-framboise: #C2255C;
+  --color-framboise-dark: #9A1C48;
+  --color-framboise-light: #F6D9E3;
+  --color-orange: #F2762E;
+  --color-orange-light: #FDE4D2;
+  --color-creme: #FBF3E9;
+  --color-creme-dark: #F1E4D3;
+  --color-anthracite: #221A1D;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-framboise: var(--color-framboise);
+  --color-framboise-dark: var(--color-framboise-dark);
+  --color-framboise-light: var(--color-framboise-light);
+  --color-orange: var(--color-orange);
+  --color-orange-light: var(--color-orange-light);
+  --color-creme: var(--color-creme);
+  --color-creme-dark: var(--color-creme-dark);
+  --color-anthracite: var(--color-anthracite);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial,
+    Helvetica, sans-serif;
+}
