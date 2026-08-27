@@ -54,6 +54,7 @@ function SectionVideos() {
   const [niveau, setNiveau] = useState<string>(NIVEAUX[0]);
   const [lienVimeo, setLienVimeo] = useState("");
   const [estVedette, setEstVedette] = useState(false);
+  const [videoEnEdition, setVideoEnEdition] = useState<Video | null>(null);
 
   async function chargerVideos() {
     setChargement(true);
@@ -79,6 +80,27 @@ function SectionVideos() {
     );
   }
 
+  function reinitialiserFormulaire() {
+    setTitre("");
+    setLienVimeo("");
+    setDureeMin(20);
+    setCategoriesSelectionnees([]);
+    setEstVedette(false);
+    setVideoEnEdition(null);
+  }
+
+  function commencerEdition(video: Video) {
+    setVideoEnEdition(video);
+    setTitre(video.titre);
+    setCategoriesSelectionnees(video.categories ?? []);
+    setDureeMin(video.duree_min);
+    setNiveau(video.niveau);
+    setLienVimeo(`https://vimeo.com/${video.vimeo_id}`);
+    setEstVedette(video.est_vedette);
+    setErreur(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function ajouterVideo(
     e: React.MouseEvent<HTMLButtonElement>,
     statut: "publie" | "brouillon"
@@ -102,7 +124,7 @@ function SectionVideos() {
 
     setEnvoi(true);
     const supabase = createClient();
-    const { error } = await supabase.from("videos").insert({
+    const donnees = {
       titre: titre.trim(),
       categories: categoriesSelectionnees,
       duree_min: dureeMin,
@@ -110,7 +132,11 @@ function SectionVideos() {
       vimeo_id: vimeoId,
       statut,
       est_vedette: estVedette,
-    });
+    };
+
+    const { error } = videoEnEdition
+      ? await supabase.from("videos").update(donnees).eq("id", videoEnEdition.id)
+      : await supabase.from("videos").insert(donnees);
     setEnvoi(false);
 
     if (error) {
@@ -118,11 +144,7 @@ function SectionVideos() {
       return;
     }
 
-    setTitre("");
-    setLienVimeo("");
-    setDureeMin(20);
-    setCategoriesSelectionnees([]);
-    setEstVedette(false);
+    reinitialiserFormulaire();
     chargerVideos();
   }
 
@@ -147,7 +169,9 @@ function SectionVideos() {
 
   return (
     <main className="flex-1 px-6 py-8 max-w-3xl">
-      <h1 className="text-2xl font-semibold mb-6">Ajouter une video</h1>
+      <h1 className="text-2xl font-semibold mb-6">
+        {videoEnEdition ? `Modifier : ${videoEnEdition.titre}` : "Ajouter une video"}
+      </h1>
 
       <form className="rounded-2xl bg-white border border-creme-dark p-5 mb-8 space-y-4">
         <div>
@@ -228,14 +252,14 @@ function SectionVideos() {
 
         {erreur && <p className="text-sm text-framboise">{erreur}</p>}
 
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           <button
             type="button"
             disabled={envoi}
             onClick={(e) => ajouterVideo(e, "publie")}
             className="rounded-full bg-framboise text-white px-5 py-2 text-sm font-semibold disabled:opacity-50"
           >
-            Publier
+            {videoEnEdition ? "Enregistrer et publier" : "Publier"}
           </button>
           <button
             type="button"
@@ -245,6 +269,15 @@ function SectionVideos() {
           >
             Enregistrer en brouillon
           </button>
+          {videoEnEdition && (
+            <button
+              type="button"
+              onClick={reinitialiserFormulaire}
+              className="rounded-full px-5 py-2 text-sm text-anthracite/50 underline"
+            >
+              Annuler
+            </button>
+          )}
         </div>
       </form>
 
@@ -281,6 +314,12 @@ function SectionVideos() {
                 >
                   {v.statut === "publie" ? "Publiee" : "Brouillon"}
                 </span>
+                <button
+                  onClick={() => commencerEdition(v)}
+                  className="text-xs underline text-anthracite/60"
+                >
+                  Modifier
+                </button>
                 <button
                   onClick={() => changerVedette(v)}
                   className="text-xs underline text-anthracite/60"

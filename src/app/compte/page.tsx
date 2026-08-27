@@ -14,6 +14,33 @@ const OBJECTIFS = ["Perdre du poids", "Se muscler", "Gagner en souplesse", "Se s
 
 const ONGLETS = ["Mon profil", "Mon abonnement", "Mes progres", "Preferences"] as const;
 
+// Nombre de jours consecutifs avec au moins une seance terminee, en partant
+// de la seance la plus recente (pas forcement aujourd'hui).
+function calculerSerie(seances: SeanceTerminee[]): number {
+  if (seances.length === 0) return 0;
+
+  const dates = new Set(
+    seances.map((s) => new Date(s.termine_le).toDateString())
+  );
+  const datesTriees = [...dates]
+    .map((d) => new Date(d))
+    .sort((a, b) => b.getTime() - a.getTime());
+
+  let serie = 1;
+  let courante = datesTriees[0];
+  for (let i = 1; i < datesTriees.length; i++) {
+    const veille = new Date(courante);
+    veille.setDate(veille.getDate() - 1);
+    if (veille.toDateString() === datesTriees[i].toDateString()) {
+      serie++;
+      courante = datesTriees[i];
+    } else {
+      break;
+    }
+  }
+  return serie;
+}
+
 export default function MonCompte() {
   const [onglet, setOnglet] = useState<(typeof ONGLETS)[number]>("Mes progres");
   const [seances, setSeances] = useState<SeanceTerminee[]>([]);
@@ -100,14 +127,24 @@ export default function MonCompte() {
 
       {onglet === "Mes progres" && (
         <>
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
             <div className="rounded-2xl bg-white border border-creme-dark p-4">
               <p className="text-xs text-anthracite/50">Seances terminees</p>
               <p className="text-2xl font-semibold text-framboise">
                 {chargement ? "..." : seances.length}
               </p>
             </div>
-            <div className="rounded-2xl bg-white border border-creme-dark p-4">
+            <div className="rounded-2xl bg-orange-light p-4">
+              <p className="text-xs text-anthracite/60">Serie en cours</p>
+              <p className="text-2xl font-semibold text-anthracite">
+                {chargement ? "..." : calculerSerie(seances)}
+                {!chargement && calculerSerie(seances) >= 2 && " 🔥"}
+              </p>
+              <p className="text-xs text-anthracite/50">
+                jour{calculerSerie(seances) > 1 ? "s" : ""} d&apos;affilee
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white border border-creme-dark p-4 col-span-2 sm:col-span-1">
               <p className="text-xs text-anthracite/50">Derniere seance</p>
               <p className="text-sm font-medium mt-1">
                 {seances[0]
