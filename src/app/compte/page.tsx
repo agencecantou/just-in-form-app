@@ -10,6 +10,8 @@ const FORMULES = [
   { nom: "2 ans", prix: "6,50 €/mois", actuelle: false },
 ];
 
+const OBJECTIFS = ["Perdre du poids", "Se muscler", "Gagner en souplesse", "Se sentir mieux", "Preparation sportive"];
+
 const ONGLETS = ["Mon profil", "Mon abonnement", "Mes progres", "Preferences"] as const;
 
 export default function MonCompte() {
@@ -23,7 +25,7 @@ export default function MonCompte() {
       const supabase = createClient();
       const { data } = await supabase
         .from("seances_terminees")
-        .select("*, videos(titre, categorie)")
+        .select("*, videos(titre, categories)")
         .eq("utilisateur", UTILISATEUR_DEMO)
         .order("termine_le", { ascending: false });
       setSeances((data as SeanceTerminee[]) ?? []);
@@ -89,6 +91,10 @@ export default function MonCompte() {
               Resilier mon abonnement
             </button>
           </div>
+          <p className="text-xs text-anthracite/40 mt-4">
+            Paiement pas encore branche (pas de Stripe pour l&apos;instant), cet
+            onglet est une maquette fonctionnelle en attendant.
+          </p>
         </>
       )}
 
@@ -129,7 +135,9 @@ export default function MonCompte() {
                 >
                   <div>
                     <p className="font-medium text-sm">{s.videos?.titre}</p>
-                    <p className="text-xs text-anthracite/50">{s.videos?.categorie}</p>
+                    <p className="text-xs text-anthracite/50">
+                      {s.videos?.categories?.join(", ")}
+                    </p>
                   </div>
                   <p className="text-xs text-anthracite/40">
                     {new Date(s.termine_le).toLocaleDateString("fr-FR")}
@@ -141,17 +149,152 @@ export default function MonCompte() {
         </>
       )}
 
-      {onglet === "Mon profil" && (
-        <p className="text-sm text-anthracite/50">
-          A venir : informations personnelles, objectifs et securite du compte.
-        </p>
-      )}
+      {onglet === "Mon profil" && <OngletProfil />}
 
-      {onglet === "Preferences" && (
-        <p className="text-sm text-anthracite/50">
-          A venir : rappels de seance, notifications et newsletter.
+      {onglet === "Preferences" && <OngletPreferences />}
+    </div>
+  );
+}
+
+function OngletProfil() {
+  const [objectifs, setObjectifs] = useState<string[]>(["Se sentir mieux"]);
+
+  function toggle(o: string) {
+    setObjectifs((prev) => (prev.includes(o) ? prev.filter((x) => x !== o) : [...prev, o]));
+  }
+
+  return (
+    <div className="space-y-6">
+      <section className="rounded-2xl bg-white border border-creme-dark p-5">
+        <p className="font-medium text-sm mb-3">Informations</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs text-anthracite/50">Prenom</label>
+            <input
+              defaultValue="Marie"
+              className="mt-1 w-full rounded-lg border border-creme-dark px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-anthracite/50">Email</label>
+            <input
+              defaultValue="marie@example.com"
+              className="mt-1 w-full rounded-lg border border-creme-dark px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-2xl bg-white border border-creme-dark p-5">
+        <p className="font-medium text-sm mb-1">Objectifs</p>
+        <p className="text-xs text-anthracite/50 mb-3">
+          Utilises pour te proposer des seances adaptees.
         </p>
-      )}
+        <div className="flex flex-wrap gap-2">
+          {OBJECTIFS.map((o) => (
+            <button
+              key={o}
+              onClick={() => toggle(o)}
+              className={`rounded-full px-3 py-1.5 text-sm border ${
+                objectifs.includes(o)
+                  ? "bg-framboise text-white border-framboise"
+                  : "bg-white text-anthracite/70 border-creme-dark"
+              }`}
+            >
+              {o}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-2xl bg-white border border-creme-dark p-5">
+        <p className="font-medium text-sm mb-3">Securite</p>
+        <button className="text-sm text-anthracite/60 underline">
+          Changer de mot de passe
+        </button>
+        <br />
+        <button className="text-sm text-framboise underline mt-2">
+          Supprimer mon compte
+        </button>
+      </section>
+
+      <p className="text-xs text-anthracite/40">
+        Cet onglet est une maquette pour l&apos;instant (pas encore relie a un
+        vrai compte utilisateur, en attendant l&apos;authentification).
+      </p>
+    </div>
+  );
+}
+
+function OngletPreferences() {
+  const [rappels, setRappels] = useState(true);
+  const [serie, setSerie] = useState(true);
+  const [nouveautes, setNouveautes] = useState(true);
+  const [newsletter, setNewsletter] = useState(false);
+
+  return (
+    <div className="space-y-3">
+      <TogglePreference
+        titre="Rappels de seance"
+        description="Une notification les jours ou tu as prevu de t'entrainer"
+        valeur={rappels}
+        onChange={setRappels}
+      />
+      <TogglePreference
+        titre="Ne casse pas ta serie 🔥"
+        description="Un rappel si tu es sur le point de perdre ta regularite"
+        valeur={serie}
+        onChange={setSerie}
+      />
+      <TogglePreference
+        titre="Nouvelles videos"
+        description="Sois prevenue des qu'une nouvelle seance est publiee"
+        valeur={nouveautes}
+        onChange={setNouveautes}
+      />
+      <TogglePreference
+        titre="Newsletter"
+        description="Actus, conseils et offres de Just In Form"
+        valeur={newsletter}
+        onChange={setNewsletter}
+      />
+      <p className="text-xs text-anthracite/40 pt-2">
+        Reglages non persistes pour l&apos;instant (maquette), a brancher avec
+        l&apos;envoi d&apos;emails/notifications plus tard.
+      </p>
+    </div>
+  );
+}
+
+function TogglePreference({
+  titre,
+  description,
+  valeur,
+  onChange,
+}: {
+  titre: string;
+  description: string;
+  valeur: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="rounded-xl bg-white border border-creme-dark p-4 flex items-center justify-between gap-4">
+      <div>
+        <p className="text-sm font-medium">{titre}</p>
+        <p className="text-xs text-anthracite/50">{description}</p>
+      </div>
+      <button
+        onClick={() => onChange(!valeur)}
+        className={`shrink-0 w-11 h-6 rounded-full transition relative ${
+          valeur ? "bg-framboise" : "bg-creme-dark"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${
+            valeur ? "left-5" : "left-0.5"
+          }`}
+        />
+      </button>
     </div>
   );
 }
