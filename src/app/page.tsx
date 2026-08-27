@@ -19,6 +19,17 @@ const FORMULES = [
 export default function Home() {
   return (
     <main className="flex-1">
+      {/* Barre du haut */}
+      <header className="flex items-center justify-between px-6 py-4 max-w-5xl mx-auto w-full">
+        <span className="font-semibold text-framboise">Just In Form</span>
+        <Link
+          href="/connexion"
+          className="rounded-full border border-anthracite/20 px-4 py-1.5 text-sm hover:bg-creme"
+        >
+          Se connecter
+        </Link>
+      </header>
+
       {/* Hero */}
       <section className="bg-anthracite text-creme px-6 py-20 sm:py-28">
         <div className="mx-auto max-w-5xl flex flex-col items-center text-center gap-6">
