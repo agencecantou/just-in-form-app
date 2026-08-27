@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { UTILISATEUR_DEMO, type SeanceTerminee } from "@/lib/types";
+import type { SeanceTerminee } from "@/lib/types";
 
 const FORMULES = [
   { nom: "Mensuel", prix: "14,90 €/mois", actuelle: false },
@@ -45,17 +45,31 @@ export default function MonCompte() {
   const [onglet, setOnglet] = useState<(typeof ONGLETS)[number]>("Mes progres");
   const [seances, setSeances] = useState<SeanceTerminee[]>([]);
   const [chargement, setChargement] = useState(true);
+  const [email, setEmail] = useState("");
+  const [prenom, setPrenom] = useState("");
 
   useEffect(() => {
     async function charger() {
       setChargement(true);
       const supabase = createClient();
-      const { data } = await supabase
-        .from("seances_terminees")
-        .select("*, videos(titre, categories)")
-        .eq("utilisateur", UTILISATEUR_DEMO)
-        .order("termine_le", { ascending: false });
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setChargement(false);
+        return;
+      }
+      setEmail(user.email ?? "");
+      const [{ data }, { data: profile }] = await Promise.all([
+        supabase
+          .from("seances_terminees")
+          .select("*, videos(titre, categories)")
+          .eq("user_id", user.id)
+          .order("termine_le", { ascending: false }),
+        supabase.from("profiles").select("prenom").eq("id", user.id).maybeSingle(),
+      ]);
       setSeances((data as SeanceTerminee[]) ?? []);
+      setPrenom(profile?.prenom ?? "");
       setChargement(false);
     }
     charger();
@@ -186,14 +200,14 @@ export default function MonCompte() {
         </>
       )}
 
-      {onglet === "Mon profil" && <OngletProfil />}
+      {onglet === "Mon profil" && <OngletProfil prenom={prenom} email={email} />}
 
       {onglet === "Preferences" && <OngletPreferences />}
     </div>
   );
 }
 
-function OngletProfil() {
+function OngletProfil({ prenom, email }: { prenom: string; email: string }) {
   const [objectifs, setObjectifs] = useState<string[]>(["Se sentir mieux"]);
 
   function toggle(o: string) {
@@ -208,15 +222,18 @@ function OngletProfil() {
           <div>
             <label className="text-xs text-anthracite/50">Prenom</label>
             <input
-              defaultValue="Marie"
+              key={prenom}
+              defaultValue={prenom}
               className="mt-1 w-full rounded-lg border border-creme-dark px-3 py-2 text-sm"
             />
           </div>
           <div>
             <label className="text-xs text-anthracite/50">Email</label>
             <input
-              defaultValue="marie@example.com"
-              className="mt-1 w-full rounded-lg border border-creme-dark px-3 py-2 text-sm"
+              key={email}
+              defaultValue={email}
+              disabled
+              className="mt-1 w-full rounded-lg border border-creme-dark px-3 py-2 text-sm bg-creme text-anthracite/60"
             />
           </div>
         </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { UTILISATEUR_DEMO, type Programme, type ProgrammeVideo, type Video } from "@/lib/types";
+import type { Programme, ProgrammeVideo, Video } from "@/lib/types";
 import { LecteurVideo } from "../page";
 
 export default function ProgrammesPage() {
@@ -36,14 +36,6 @@ export default function ProgrammesPage() {
       .eq("programme_id", programme.id)
       .order("ordre", { ascending: true });
     setVideosDuProgramme((data as ProgrammeVideo[]) ?? []);
-  }
-
-  async function marquerTerminee(video: Video) {
-    const supabase = createClient();
-    await supabase
-      .from("seances_terminees")
-      .insert({ video_id: video.id, utilisateur: UTILISATEUR_DEMO });
-    setVideoOuverte(null);
   }
 
   return (
@@ -117,7 +109,7 @@ export default function ProgrammesPage() {
         <LecteurVideo
           video={videoOuverte}
           onFermer={() => setVideoOuverte(null)}
-          onTerminee={() => marquerTerminee(videoOuverte)}
+          onTerminee={() => {}}
         />
       )}
     </main>

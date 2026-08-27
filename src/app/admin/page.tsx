@@ -3,18 +3,25 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { extraireVimeoId } from "@/lib/vimeo";
-import { CATEGORIES, NIVEAUX, type Programme, type ProgrammeVideo, type Video } from "@/lib/types";
+import {
+  CATEGORIES,
+  NIVEAUX,
+  type Avis,
+  type Programme,
+  type ProgrammeVideo,
+  type Video,
+} from "@/lib/types";
 
 export default function Admin() {
-  const [section, setSection] = useState<"videos" | "programmes">("videos");
+  const [section, setSection] = useState<"videos" | "programmes" | "avis">("videos");
 
   return (
-    <div className="flex-1 flex">
-      <aside className="hidden sm:flex w-56 flex-col gap-1 bg-anthracite text-creme px-4 py-6">
-        <p className="mb-4 px-2 text-lg font-semibold">Espace coach</p>
+    <div className="flex-1 flex flex-col sm:flex-row">
+      <aside className="flex flex-row sm:flex-col gap-1 sm:w-56 overflow-x-auto bg-anthracite text-creme px-3 sm:px-4 py-3 sm:py-6">
+        <p className="hidden sm:block mb-4 px-2 text-lg font-semibold">Espace coach</p>
         <button
           onClick={() => setSection("videos")}
-          className={`text-left rounded-lg px-3 py-2 text-sm ${
+          className={`shrink-0 whitespace-nowrap text-left rounded-lg px-3 py-2 text-sm ${
             section === "videos"
               ? "bg-orange text-anthracite font-medium"
               : "text-creme/70 hover:bg-white/10"
@@ -24,7 +31,7 @@ export default function Admin() {
         </button>
         <button
           onClick={() => setSection("programmes")}
-          className={`text-left rounded-lg px-3 py-2 text-sm ${
+          className={`shrink-0 whitespace-nowrap text-left rounded-lg px-3 py-2 text-sm ${
             section === "programmes"
               ? "bg-orange text-anthracite font-medium"
               : "text-creme/70 hover:bg-white/10"
@@ -32,13 +39,81 @@ export default function Admin() {
         >
           Programmes
         </button>
-        <a href="/app" className="mt-auto rounded-lg px-3 py-2 text-sm text-creme/70 hover:bg-white/10">
+        <button
+          onClick={() => setSection("avis")}
+          className={`shrink-0 whitespace-nowrap text-left rounded-lg px-3 py-2 text-sm ${
+            section === "avis"
+              ? "bg-orange text-anthracite font-medium"
+              : "text-creme/70 hover:bg-white/10"
+          }`}
+        >
+          Avis des abonnees
+        </button>
+        <a
+          href="/app"
+          className="shrink-0 whitespace-nowrap sm:mt-auto rounded-lg px-3 py-2 text-sm text-creme/70 hover:bg-white/10"
+        >
           Voir cote abonnee
         </a>
       </aside>
 
-      {section === "videos" ? <SectionVideos /> : <SectionProgrammes />}
+      {section === "videos" && <SectionVideos />}
+      {section === "programmes" && <SectionProgrammes />}
+      {section === "avis" && <SectionAvis />}
     </div>
+  );
+}
+
+function SectionAvis() {
+  const [avis, setAvis] = useState<Avis[]>([]);
+  const [chargement, setChargement] = useState(true);
+
+  useEffect(() => {
+    async function charger() {
+      setChargement(true);
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("avis")
+        .select("*, videos(titre), profiles(prenom, email)")
+        .order("created_at", { ascending: false });
+      setAvis((data as Avis[]) ?? []);
+      setChargement(false);
+    }
+    charger();
+  }, []);
+
+  return (
+    <main className="flex-1 px-6 py-8 max-w-3xl">
+      <h1 className="text-2xl font-semibold mb-1">Avis des abonnees</h1>
+      <p className="text-anthracite/60 mb-6">
+        Les messages libres laisses apres une seance, prives (non visibles des autres abonnees).
+      </p>
+
+      {chargement ? (
+        <p className="text-sm text-anthracite/50">Chargement...</p>
+      ) : avis.length === 0 ? (
+        <p className="text-sm text-anthracite/50">Aucun avis pour le moment.</p>
+      ) : (
+        <div className="space-y-3">
+          {avis.map((a) => (
+            <div key={a.id} className="rounded-xl bg-white border border-creme-dark p-4">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <p className="text-sm font-medium">
+                  {a.profiles?.prenom || a.profiles?.email || "Abonnee"}
+                  {a.videos?.titre && (
+                    <span className="text-anthracite/50 font-normal"> · {a.videos.titre}</span>
+                  )}
+                </p>
+                <p className="text-xs text-anthracite/40">
+                  {new Date(a.created_at).toLocaleDateString("fr-FR")}
+                </p>
+              </div>
+              <p className="text-sm text-anthracite/70 mt-2">{a.message}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </main>
   );
 }
 
