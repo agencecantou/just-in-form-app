@@ -122,10 +122,13 @@ export default function AppHome() {
   return (
     <>
       <main className="flex-1 px-6 py-8 max-w-4xl">
-        <h1 className="text-2xl font-semibold mb-1">Salut ! 👋</h1>
+        <h1 className="text-2xl font-semibold mb-1">
+          {terminees.size === 0 ? "Bienvenue ! 👋" : "Salut ! 👋"}
+        </h1>
         <p className="text-anthracite/60 mb-6">
-          {terminees.size} seance{terminees.size > 1 ? "s" : ""} terminee
-          {terminees.size > 1 ? "s" : ""}, continue comme ca.
+          {terminees.size === 0
+            ? "Prete a demarrer ta premiere seance ?"
+            : `${terminees.size} seance${terminees.size > 1 ? "s" : ""} terminee${terminees.size > 1 ? "s" : ""}, continue comme ca.`}
         </p>
 
         {chargement ? (

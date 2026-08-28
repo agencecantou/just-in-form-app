@@ -41,12 +41,38 @@ function calculerSerie(seances: SeanceTerminee[]): number {
   return serie;
 }
 
+// Donnees d'exemple affichees quand personne n'est connecte (demo client,
+// ou connexion temporairement desactivee via AUTH_ACTIVE dans le
+// middleware) : ca permet de montrer a quoi ressemble "Mon compte" rempli
+// plutot qu'un ecran vide.
+const SEANCES_APERCU: SeanceTerminee[] = [
+  {
+    id: "apercu-1",
+    video_id: "apercu",
+    termine_le: new Date(Date.now() - 86400000).toISOString(),
+    videos: { titre: "Echauffement 1", categories: ["Piloxing"] },
+  } as SeanceTerminee,
+  {
+    id: "apercu-2",
+    video_id: "apercu",
+    termine_le: new Date(Date.now() - 2 * 86400000).toISOString(),
+    videos: { titre: "AMRAP #1", categories: ["HIIT"] },
+  } as SeanceTerminee,
+  {
+    id: "apercu-3",
+    video_id: "apercu",
+    termine_le: new Date(Date.now() - 3 * 86400000).toISOString(),
+    videos: { titre: "Comprendre le bon placement en Pilates", categories: ["Pilates"] },
+  } as SeanceTerminee,
+];
+
 export default function MonCompte() {
   const [onglet, setOnglet] = useState<(typeof ONGLETS)[number]>("Mes progres");
   const [seances, setSeances] = useState<SeanceTerminee[]>([]);
   const [chargement, setChargement] = useState(true);
   const [email, setEmail] = useState("");
   const [prenom, setPrenom] = useState("");
+  const [apercu, setApercu] = useState(false);
 
   useEffect(() => {
     async function charger() {
@@ -56,6 +82,10 @@ export default function MonCompte() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) {
+        setApercu(true);
+        setEmail("demo@just-in-form.fr");
+        setPrenom("Demo");
+        setSeances(SEANCES_APERCU);
         setChargement(false);
         return;
       }
@@ -78,7 +108,13 @@ export default function MonCompte() {
 
   return (
     <div className="flex-1 px-6 py-8 max-w-3xl mx-auto w-full">
-      <h1 className="text-2xl font-semibold mb-6">Mon compte</h1>
+      <h1 className="text-2xl font-semibold mb-1">Mon compte</h1>
+      {apercu && (
+        <p className="text-xs text-anthracite bg-orange-light inline-block rounded-full px-3 py-1 mb-5">
+          Apercu de demonstration, connecte-toi pour voir tes vraies donnees
+        </p>
+      )}
+      {!apercu && <div className="mb-6" />}
 
       <nav className="flex gap-2 mb-8 border-b border-creme-dark">
         {ONGLETS.map((item) => (
