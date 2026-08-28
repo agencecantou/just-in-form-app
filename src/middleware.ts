@@ -4,7 +4,17 @@ import { createServerClient } from "@supabase/ssr";
 // Protege /app, /compte et /admin : redirige vers /connexion si personne
 // n'est connectee. /admin est en plus reserve au role "coach" (verifie via
 // la table profiles). La securite fine (RLS) reste a durcir plus tard.
+//
+// INTERRUPTEUR TEMPORAIRE : mettre a false pour desactiver toute la
+// protection par connexion (demo client par exemple). Remettre a true pour
+// reactiver l'authentification normalement.
+const AUTH_ACTIVE = false;
+
 export async function middleware(request: NextRequest) {
+  if (!AUTH_ACTIVE) {
+    return NextResponse.next();
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
