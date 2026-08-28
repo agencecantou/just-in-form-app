@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -99,6 +100,15 @@ function FormulaireConnexion() {
           >
             {mode === "connexion" ? "Se connecter" : "Creer mon compte"}
           </button>
+
+          {mode === "connexion" && (
+            <Link
+              href="/mot-de-passe-oublie"
+              className="block text-center text-xs text-anthracite/50 underline"
+            >
+              Mot de passe oublie ?
+            </Link>
+          )}
         </form>
 
         <button
