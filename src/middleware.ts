@@ -8,7 +8,7 @@ import { createServerClient } from "@supabase/ssr";
 // INTERRUPTEUR TEMPORAIRE : mettre a false pour desactiver toute la
 // protection par connexion (demo client par exemple). Remettre a true pour
 // reactiver l'authentification normalement.
-const AUTH_ACTIVE = false;
+const AUTH_ACTIVE = true;
 
 export async function middleware(request: NextRequest) {
   if (!AUTH_ACTIVE) {

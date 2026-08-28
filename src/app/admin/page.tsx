@@ -13,9 +13,9 @@ import {
 } from "@/lib/types";
 
 export default function Admin() {
-  const [section, setSection] = useState<"videos" | "programmes" | "categories" | "avis">(
-    "videos"
-  );
+  const [section, setSection] = useState<
+    "videos" | "programmes" | "categories" | "comptes" | "avis"
+  >("videos");
 
   return (
     <div className="flex-1 flex flex-col sm:flex-row">
@@ -52,6 +52,16 @@ export default function Admin() {
           Categories
         </button>
         <button
+          onClick={() => setSection("comptes")}
+          className={`shrink-0 whitespace-nowrap text-left rounded-lg px-3 py-2 text-sm ${
+            section === "comptes"
+              ? "bg-orange text-anthracite font-medium"
+              : "text-creme/70 hover:bg-white/10"
+          }`}
+        >
+          Comptes
+        </button>
+        <button
           onClick={() => setSection("avis")}
           className={`shrink-0 whitespace-nowrap text-left rounded-lg px-3 py-2 text-sm ${
             section === "avis"
@@ -72,8 +82,101 @@ export default function Admin() {
       {section === "videos" && <SectionVideos />}
       {section === "programmes" && <SectionProgrammes />}
       {section === "categories" && <SectionCategories />}
+      {section === "comptes" && <SectionComptes />}
       {section === "avis" && <SectionAvis />}
     </div>
+  );
+}
+
+function SectionComptes() {
+  const [email, setEmail] = useState("");
+  const [prenom, setPrenom] = useState("");
+  const [role, setRole] = useState<"abonnee" | "coach">("abonnee");
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
+  const [succes, setSucces] = useState<string | null>(null);
+
+  async function creerCompte(e: React.FormEvent) {
+    e.preventDefault();
+    setErreur(null);
+    setSucces(null);
+    if (!email.trim()) {
+      setErreur("Email requis.");
+      return;
+    }
+    setEnvoi(true);
+    const reponse = await fetch("/api/admin/creer-compte", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email.trim(), prenom: prenom.trim(), role }),
+    });
+    const resultat = await reponse.json();
+    setEnvoi(false);
+
+    if (!reponse.ok) {
+      setErreur(resultat.erreur || "Une erreur est survenue.");
+      return;
+    }
+    setSucces(`Invitation envoyee a ${email.trim()}.`);
+    setEmail("");
+    setPrenom("");
+    setRole("abonnee");
+  }
+
+  return (
+    <main className="flex-1 px-6 py-8 max-w-lg">
+      <h1 className="text-2xl font-semibold mb-1">Comptes</h1>
+      <p className="text-anthracite/60 mb-6">
+        Cree un compte pour une abonnee (ou un autre coach) sans qu&apos;elle
+        ait besoin de s&apos;inscrire elle-meme. Un email d&apos;invitation
+        lui est envoye pour qu&apos;elle definisse son mot de passe.
+      </p>
+
+      <form onSubmit={creerCompte} className="rounded-2xl bg-white border border-creme-dark p-5 space-y-4">
+        <div>
+          <label className="text-sm font-medium">Email</label>
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-creme-dark px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-sm font-medium">
+            Prenom <span className="text-anthracite/40 font-normal">(optionnel)</span>
+          </label>
+          <input
+            value={prenom}
+            onChange={(e) => setPrenom(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-creme-dark px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-sm font-medium">Type de compte</label>
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value as "abonnee" | "coach")}
+            className="mt-1 w-full rounded-lg border border-creme-dark px-3 py-2 text-sm"
+          >
+            <option value="abonnee">Abonnee</option>
+            <option value="coach">Coach</option>
+          </select>
+        </div>
+
+        {erreur && <p className="text-sm text-framboise">{erreur}</p>}
+        {succes && <p className="text-sm text-framboise">{succes}</p>}
+
+        <button
+          type="submit"
+          disabled={envoi}
+          className="rounded-full bg-framboise text-white px-5 py-2 text-sm font-semibold disabled:opacity-50"
+        >
+          {envoi ? "Envoi..." : "Envoyer l'invitation"}
+        </button>
+      </form>
+    </main>
   );
 }
 
