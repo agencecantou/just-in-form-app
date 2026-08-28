@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Programme, ProgrammeVideo, Video } from "@/lib/types";
-import { LecteurVideo } from "../page";
+import LecteurVideo from "@/components/LecteurVideo";
 
 function ProgrammesPageInterieur() {
   const params = useSearchParams();
@@ -55,14 +55,14 @@ function ProgrammesPageInterieur() {
     <main className="flex-1 px-6 py-8 max-w-4xl">
       <h1 className="text-2xl font-semibold mb-1">Les programmes</h1>
       <p className="text-anthracite/60 mb-6">
-        Des plans guides sur plusieurs semaines pour progresser pas a pas.
+        Des plans guidés sur plusieurs semaines pour progresser pas à pas.
       </p>
 
       {chargement ? (
         <p className="text-sm text-anthracite/50">Chargement...</p>
       ) : programmes.length === 0 ? (
         <p className="text-sm text-anthracite/50">
-          Aucun programme publie pour le moment, reviens bientot.
+          Aucun programme publié pour le moment, reviens bientôt.
         </p>
       ) : !programmeOuvert ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -74,7 +74,7 @@ function ProgrammesPageInterieur() {
             >
               <p className="font-semibold">
                 {p.titre}
-                {p.est_lancement && <span className="ml-2 text-xs text-orange">🚀 Pour bien demarrer</span>}
+                {p.est_lancement && <span className="ml-2 text-xs text-orange">🚀 Pour bien démarrer</span>}
               </p>
               <p className="text-sm text-anthracite/60 mt-1">{p.description}</p>
             </button>
@@ -93,7 +93,7 @@ function ProgrammesPageInterieur() {
 
           {videosDuProgramme.length === 0 ? (
             <p className="text-sm text-anthracite/50">
-              Ce programme n&apos;a pas encore de seances.
+              Ce programme n&apos;a pas encore de séances.
             </p>
           ) : (
             <div className="space-y-2">
@@ -106,7 +106,7 @@ function ProgrammesPageInterieur() {
                   >
                     <div>
                       <p className="font-medium text-sm">
-                        Seance {i + 1} : {pv.videos.titre}
+                        Séance {i + 1} : {pv.videos.titre}
                       </p>
                       <p className="text-xs text-anthracite/50">
                         {pv.videos.categories?.join(", ")} &middot; {pv.videos.duree_min} min

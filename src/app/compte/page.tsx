@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { SeanceTerminee } from "@/lib/types";
 
 const FORMULES = [
   { nom: "Mensuel", prix: "14,90 €/mois", actuelle: false },
@@ -10,69 +9,34 @@ const FORMULES = [
   { nom: "2 ans", prix: "6,50 €/mois", actuelle: false },
 ];
 
-const OBJECTIFS = ["Perdre du poids", "Se muscler", "Gagner en souplesse", "Se sentir mieux", "Preparation sportive"];
+const OBJECTIFS = ["Perdre du poids", "Se muscler", "Gagner en souplesse", "Se sentir mieux", "Préparation sportive"];
 
-const ONGLETS = ["Mon profil", "Mon abonnement", "Mes progres", "Preferences"] as const;
+const ONGLETS = ["Mon profil", "Mon abonnement", "Préférences"] as const;
 
-// Nombre de jours consecutifs avec au moins une seance terminee, en partant
-// de la seance la plus recente (pas forcement aujourd'hui).
-function calculerSerie(seances: SeanceTerminee[]): number {
-  if (seances.length === 0) return 0;
+type Preferences = {
+  rappels: boolean;
+  serie: boolean;
+  nouveautes: boolean;
+  newsletter: boolean;
+  objectifs: string[];
+};
 
-  const dates = new Set(
-    seances.map((s) => new Date(s.termine_le).toDateString())
-  );
-  const datesTriees = [...dates]
-    .map((d) => new Date(d))
-    .sort((a, b) => b.getTime() - a.getTime());
-
-  let serie = 1;
-  let courante = datesTriees[0];
-  for (let i = 1; i < datesTriees.length; i++) {
-    const veille = new Date(courante);
-    veille.setDate(veille.getDate() - 1);
-    if (veille.toDateString() === datesTriees[i].toDateString()) {
-      serie++;
-      courante = datesTriees[i];
-    } else {
-      break;
-    }
-  }
-  return serie;
-}
-
-// Donnees d'exemple affichees quand personne n'est connecte (demo client,
-// ou connexion temporairement desactivee via AUTH_ACTIVE dans le
-// middleware) : ca permet de montrer a quoi ressemble "Mon compte" rempli
-// plutot qu'un ecran vide.
-const SEANCES_APERCU: SeanceTerminee[] = [
-  {
-    id: "apercu-1",
-    video_id: "apercu",
-    termine_le: new Date(Date.now() - 86400000).toISOString(),
-    videos: { titre: "Echauffement 1", categories: ["Piloxing"] },
-  } as SeanceTerminee,
-  {
-    id: "apercu-2",
-    video_id: "apercu",
-    termine_le: new Date(Date.now() - 2 * 86400000).toISOString(),
-    videos: { titre: "AMRAP #1", categories: ["HIIT"] },
-  } as SeanceTerminee,
-  {
-    id: "apercu-3",
-    video_id: "apercu",
-    termine_le: new Date(Date.now() - 3 * 86400000).toISOString(),
-    videos: { titre: "Comprendre le bon placement en Pilates", categories: ["Pilates"] },
-  } as SeanceTerminee,
-];
+const PREFERENCES_DEFAUT: Preferences = {
+  rappels: true,
+  serie: true,
+  nouveautes: true,
+  newsletter: false,
+  objectifs: ["Se sentir mieux"],
+};
 
 export default function MonCompte() {
-  const [onglet, setOnglet] = useState<(typeof ONGLETS)[number]>("Mes progres");
-  const [seances, setSeances] = useState<SeanceTerminee[]>([]);
+  const [onglet, setOnglet] = useState<(typeof ONGLETS)[number]>("Mon profil");
   const [chargement, setChargement] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [prenom, setPrenom] = useState("");
-  const [apercu, setApercu] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [preferences, setPreferences] = useState<Preferences>(PREFERENCES_DEFAUT);
 
   useEffect(() => {
     async function charger() {
@@ -82,184 +46,231 @@ export default function MonCompte() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) {
-        setApercu(true);
-        setEmail("demo@just-in-form.fr");
-        setPrenom("Demo");
-        setSeances(SEANCES_APERCU);
         setChargement(false);
         return;
       }
+      setUserId(user.id);
       setEmail(user.email ?? "");
-      const [{ data }, { data: profile }] = await Promise.all([
-        supabase
-          .from("seances_terminees")
-          .select("*, videos(titre, categories)")
-          .eq("user_id", user.id)
-          .order("termine_le", { ascending: false }),
-        supabase.from("profiles").select("prenom").eq("id", user.id).maybeSingle(),
-      ]);
-      setSeances((data as SeanceTerminee[]) ?? []);
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("prenom, photo_url, preferences")
+        .eq("id", user.id)
+        .maybeSingle();
       setPrenom(profile?.prenom ?? "");
+      setPhotoUrl(profile?.photo_url ?? null);
+      if (profile?.preferences && Object.keys(profile.preferences).length > 0) {
+        setPreferences({ ...PREFERENCES_DEFAUT, ...profile.preferences });
+      }
       setChargement(false);
     }
     charger();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <div className="flex-1 px-6 py-8 max-w-3xl mx-auto w-full">
-      <h1 className="text-2xl font-semibold mb-1">Mon compte</h1>
-      {apercu && (
-        <p className="text-xs text-anthracite bg-orange-light inline-block rounded-full px-3 py-1 mb-5">
-          Apercu de demonstration, connecte-toi pour voir tes vraies donnees
+      <h1 className="text-2xl font-semibold mb-6">Mon compte</h1>
+
+      {chargement ? (
+        <p className="text-sm text-anthracite/50">Chargement...</p>
+      ) : !userId ? (
+        <p className="text-sm text-anthracite/50">
+          Connecte-toi pour accéder à ton compte.
         </p>
-      )}
-      {!apercu && <div className="mb-6" />}
-
-      <nav className="flex gap-2 mb-8 border-b border-creme-dark">
-        {ONGLETS.map((item) => (
-          <button
-            key={item}
-            onClick={() => setOnglet(item)}
-            className={`px-3 py-2 text-sm font-medium border-b-2 ${
-              onglet === item
-                ? "border-framboise text-framboise"
-                : "border-transparent text-anthracite/50"
-            }`}
-          >
-            {item}
-          </button>
-        ))}
-      </nav>
-
-      {onglet === "Mon abonnement" && (
+      ) : (
         <>
-          <section className="rounded-2xl bg-framboise-light p-5 mb-6">
-            <p className="text-sm text-anthracite/60">Formule actuelle</p>
-            <p className="text-xl font-semibold text-framboise">
-              Annuel, 8,90 €/mois
-            </p>
-            <p className="text-sm text-anthracite/60 mt-1">
-              Tu economises 71 € par an par rapport au mensuel
-            </p>
-          </section>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
-            {FORMULES.map((f) => (
+          <nav className="flex gap-2 mb-8 border-b border-creme-dark">
+            {ONGLETS.map((item) => (
               <button
-                key={f.nom}
-                className={`rounded-xl border p-4 text-left ${
-                  f.actuelle
-                    ? "border-framboise bg-white"
-                    : "border-creme-dark bg-white hover:border-framboise/50"
+                key={item}
+                onClick={() => setOnglet(item)}
+                className={`px-3 py-2 text-sm font-medium border-b-2 ${
+                  onglet === item
+                    ? "border-framboise text-framboise"
+                    : "border-transparent text-anthracite/50"
                 }`}
               >
-                <p className="font-medium">{f.nom}</p>
-                <p className="text-sm text-anthracite/60">{f.prix}</p>
+                {item}
               </button>
             ))}
-          </div>
+          </nav>
 
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button className="rounded-full border border-creme-dark px-5 py-2 text-sm">
-              Mettre en pause 3 mois
-            </button>
-            <button className="rounded-full border border-anthracite/20 px-5 py-2 text-sm text-anthracite/60">
-              Resilier mon abonnement
-            </button>
-          </div>
-          <p className="text-xs text-anthracite/40 mt-4">
-            Paiement pas encore branche (pas de Stripe pour l&apos;instant), cet
-            onglet est une maquette fonctionnelle en attendant.
-          </p>
-        </>
-      )}
+          {onglet === "Mon abonnement" && (
+            <>
+              <section className="rounded-2xl bg-framboise-light p-5 mb-6">
+                <p className="text-sm text-anthracite/60">Formule actuelle</p>
+                <p className="text-xl font-semibold text-framboise">Annuel, 8,90 €/mois</p>
+                <p className="text-sm text-anthracite/60 mt-1">
+                  Tu économises 71 € par an par rapport au mensuel
+                </p>
+              </section>
 
-      {onglet === "Mes progres" && (
-        <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
-            <div className="rounded-2xl bg-white border border-creme-dark p-4">
-              <p className="text-xs text-anthracite/50">Seances terminees</p>
-              <p className="text-2xl font-semibold text-framboise">
-                {chargement ? "..." : seances.length}
-              </p>
-            </div>
-            <div className="rounded-2xl bg-orange-light p-4">
-              <p className="text-xs text-anthracite/60">Serie en cours</p>
-              <p className="text-2xl font-semibold text-anthracite">
-                {chargement ? "..." : calculerSerie(seances)}
-                {!chargement && calculerSerie(seances) >= 2 && " 🔥"}
-              </p>
-              <p className="text-xs text-anthracite/50">
-                jour{calculerSerie(seances) > 1 ? "s" : ""} d&apos;affilee
-              </p>
-            </div>
-            <div className="rounded-2xl bg-white border border-creme-dark p-4 col-span-2 sm:col-span-1">
-              <p className="text-xs text-anthracite/50">Derniere seance</p>
-              <p className="text-sm font-medium mt-1">
-                {seances[0]
-                  ? new Date(seances[0].termine_le).toLocaleDateString("fr-FR")
-                  : "Aucune pour le moment"}
-              </p>
-            </div>
-          </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
+                {FORMULES.map((f) => (
+                  <button
+                    key={f.nom}
+                    className={`rounded-xl border p-4 text-left ${
+                      f.actuelle
+                        ? "border-framboise bg-white"
+                        : "border-creme-dark bg-white hover:border-framboise/50"
+                    }`}
+                  >
+                    <p className="font-medium">{f.nom}</p>
+                    <p className="text-sm text-anthracite/60">{f.prix}</p>
+                  </button>
+                ))}
+              </div>
 
-          <h2 className="text-sm font-semibold text-anthracite/60 mb-3">
-            Historique
-          </h2>
-          {chargement ? (
-            <p className="text-sm text-anthracite/50">Chargement...</p>
-          ) : seances.length === 0 ? (
-            <p className="text-sm text-anthracite/50">
-              Termine une seance depuis l&apos;app pour la voir apparaitre ici.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {seances.map((s) => (
-                <div
-                  key={s.id}
-                  className="rounded-xl bg-white border border-creme-dark p-3 flex items-center justify-between"
-                >
-                  <div>
-                    <p className="font-medium text-sm">{s.videos?.titre}</p>
-                    <p className="text-xs text-anthracite/50">
-                      {s.videos?.categories?.join(", ")}
-                    </p>
-                  </div>
-                  <p className="text-xs text-anthracite/40">
-                    {new Date(s.termine_le).toLocaleDateString("fr-FR")}
-                  </p>
-                </div>
-              ))}
-            </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button className="rounded-full border border-creme-dark px-5 py-2 text-sm">
+                  Mettre en pause 3 mois
+                </button>
+                <button className="rounded-full border border-anthracite/20 px-5 py-2 text-sm text-anthracite/60">
+                  Résilier mon abonnement
+                </button>
+              </div>
+              <p className="text-xs text-anthracite/40 mt-4">
+                Le paiement en ligne (Stripe) arrive bientôt : cet onglet
+                affiche pour l&apos;instant une formule de démonstration.
+              </p>
+            </>
+          )}
+
+          {onglet === "Mon profil" && (
+            <OngletProfil
+              userId={userId}
+              prenom={prenom}
+              email={email}
+              photoUrl={photoUrl}
+              objectifs={preferences.objectifs}
+              onEnregistre={(p, photo, objectifs) => {
+                setPrenom(p);
+                setPhotoUrl(photo);
+                setPreferences((prev) => ({ ...prev, objectifs }));
+              }}
+            />
+          )}
+
+          {onglet === "Préférences" && (
+            <OngletPreferences userId={userId} preferences={preferences} onChange={setPreferences} />
           )}
         </>
       )}
-
-      {onglet === "Mon profil" && <OngletProfil prenom={prenom} email={email} />}
-
-      {onglet === "Preferences" && <OngletPreferences />}
     </div>
   );
 }
 
-function OngletProfil({ prenom, email }: { prenom: string; email: string }) {
-  const [objectifs, setObjectifs] = useState<string[]>(["Se sentir mieux"]);
+function OngletProfil({
+  userId,
+  prenom,
+  email,
+  photoUrl,
+  objectifs,
+  onEnregistre,
+}: {
+  userId: string;
+  prenom: string;
+  email: string;
+  photoUrl: string | null;
+  objectifs: string[];
+  onEnregistre: (prenom: string, photoUrl: string | null, objectifs: string[]) => void;
+}) {
+  const [prenomSaisi, setPrenomSaisi] = useState(prenom);
+  const [objectifsSaisis, setObjectifsSaisis] = useState<string[]>(objectifs);
+  const [photo, setPhoto] = useState<string | null>(photoUrl);
+  const [enregistrement, setEnregistrement] = useState(false);
+  const [uploadEnCours, setUploadEnCours] = useState(false);
+  const [message, setMessage] = useState("");
+  const inputFichierRef = useRef<HTMLInputElement>(null);
 
-  function toggle(o: string) {
-    setObjectifs((prev) => (prev.includes(o) ? prev.filter((x) => x !== o) : [...prev, o]));
+  useEffect(() => setPrenomSaisi(prenom), [prenom]);
+  useEffect(() => setObjectifsSaisis(objectifs), [objectifs]);
+  useEffect(() => setPhoto(photoUrl), [photoUrl]);
+
+  function toggleObjectif(o: string) {
+    setObjectifsSaisis((prev) => (prev.includes(o) ? prev.filter((x) => x !== o) : [...prev, o]));
+  }
+
+  async function choisirPhoto(fichier: File) {
+    setUploadEnCours(true);
+    const supabase = createClient();
+    const extension = fichier.name.split(".").pop();
+    const chemin = `photos-profil/${userId}-${Date.now()}.${extension}`;
+    const { error } = await supabase.storage.from("images").upload(chemin, fichier, { upsert: true });
+    if (!error) {
+      const { data } = supabase.storage.from("images").getPublicUrl(chemin);
+      setPhoto(data.publicUrl);
+    }
+    setUploadEnCours(false);
+  }
+
+  async function enregistrer() {
+    setEnregistrement(true);
+    setMessage("");
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("profiles")
+      .update({ prenom: prenomSaisi, photo_url: photo })
+      .eq("id", userId);
+    if (!error) {
+      // Les objectifs vivent dans le meme champ preferences que l'onglet
+      // Preferences : on ne touche que la cle objectifs pour ne pas ecraser
+      // le reste.
+      const { data: profil } = await supabase.from("profiles").select("preferences").eq("id", userId).maybeSingle();
+      await supabase
+        .from("profiles")
+        .update({ preferences: { ...(profil?.preferences ?? {}), objectifs: objectifsSaisis } })
+        .eq("id", userId);
+      onEnregistre(prenomSaisi, photo, objectifsSaisis);
+      setMessage("Profil enregistré.");
+    } else {
+      setMessage("Erreur pendant l'enregistrement, réessaie.");
+    }
+    setEnregistrement(false);
   }
 
   return (
     <div className="space-y-6">
       <section className="rounded-2xl bg-white border border-creme-dark p-5">
+        <p className="font-medium text-sm mb-3">Photo de profil</p>
+        <div className="flex items-center gap-4">
+          <div className="h-16 w-16 rounded-full bg-framboise-light overflow-hidden flex items-center justify-center text-framboise font-semibold text-xl shrink-0">
+            {photo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={photo} alt="" className="h-full w-full object-cover" />
+            ) : (
+              prenomSaisi.charAt(0).toUpperCase() || "?"
+            )}
+          </div>
+          <div>
+            <input
+              ref={inputFichierRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const fichier = e.target.files?.[0];
+                if (fichier) choisirPhoto(fichier);
+              }}
+            />
+            <button
+              onClick={() => inputFichierRef.current?.click()}
+              disabled={uploadEnCours}
+              className="rounded-full border border-creme-dark px-4 py-2 text-sm disabled:opacity-50"
+            >
+              {uploadEnCours ? "Envoi..." : "Changer la photo"}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-2xl bg-white border border-creme-dark p-5">
         <p className="font-medium text-sm mb-3">Informations</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="text-xs text-anthracite/50">Prenom</label>
+            <label className="text-xs text-anthracite/50">Prénom</label>
             <input
-              key={prenom}
-              defaultValue={prenom}
+              value={prenomSaisi}
+              onChange={(e) => setPrenomSaisi(e.target.value)}
               className="mt-1 w-full rounded-lg border border-creme-dark px-3 py-2 text-sm"
             />
           </div>
@@ -278,15 +289,15 @@ function OngletProfil({ prenom, email }: { prenom: string; email: string }) {
       <section className="rounded-2xl bg-white border border-creme-dark p-5">
         <p className="font-medium text-sm mb-1">Objectifs</p>
         <p className="text-xs text-anthracite/50 mb-3">
-          Utilises pour te proposer des seances adaptees.
+          Utilisés pour te proposer des séances adaptées.
         </p>
         <div className="flex flex-wrap gap-2">
           {OBJECTIFS.map((o) => (
             <button
               key={o}
-              onClick={() => toggle(o)}
+              onClick={() => toggleObjectif(o)}
               className={`rounded-full px-3 py-1.5 text-sm border ${
-                objectifs.includes(o)
+                objectifsSaisis.includes(o)
                   ? "bg-framboise text-white border-framboise"
                   : "bg-white text-anthracite/70 border-creme-dark"
               }`}
@@ -298,59 +309,75 @@ function OngletProfil({ prenom, email }: { prenom: string; email: string }) {
       </section>
 
       <section className="rounded-2xl bg-white border border-creme-dark p-5">
-        <p className="font-medium text-sm mb-3">Securite</p>
-        <button className="text-sm text-anthracite/60 underline">
+        <p className="font-medium text-sm mb-3">Sécurité</p>
+        <a href="/mot-de-passe-oublie" className="text-sm text-anthracite/60 underline">
           Changer de mot de passe
-        </button>
-        <br />
-        <button className="text-sm text-framboise underline mt-2">
-          Supprimer mon compte
-        </button>
+        </a>
       </section>
 
-      <p className="text-xs text-anthracite/40">
-        Cet onglet est une maquette pour l&apos;instant (pas encore relie a un
-        vrai compte utilisateur, en attendant l&apos;authentification).
-      </p>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={enregistrer}
+          disabled={enregistrement}
+          className="rounded-full bg-framboise text-white px-5 py-2 text-sm font-semibold disabled:opacity-50"
+        >
+          {enregistrement ? "Enregistrement..." : "Enregistrer"}
+        </button>
+        {message && <p className="text-sm text-anthracite/60">{message}</p>}
+      </div>
     </div>
   );
 }
 
-function OngletPreferences() {
-  const [rappels, setRappels] = useState(true);
-  const [serie, setSerie] = useState(true);
-  const [nouveautes, setNouveautes] = useState(true);
-  const [newsletter, setNewsletter] = useState(false);
+function OngletPreferences({
+  userId,
+  preferences,
+  onChange,
+}: {
+  userId: string;
+  preferences: Preferences;
+  onChange: (p: Preferences) => void;
+}) {
+  async function changer(cle: keyof Preferences, valeur: boolean) {
+    const suivant = { ...preferences, [cle]: valeur };
+    onChange(suivant);
+    const supabase = createClient();
+    const { data: profil } = await supabase.from("profiles").select("preferences").eq("id", userId).maybeSingle();
+    await supabase
+      .from("profiles")
+      .update({ preferences: { ...(profil?.preferences ?? {}), [cle]: valeur } })
+      .eq("id", userId);
+  }
 
   return (
     <div className="space-y-3">
       <TogglePreference
-        titre="Rappels de seance"
-        description="Une notification les jours ou tu as prevu de t'entrainer"
-        valeur={rappels}
-        onChange={setRappels}
+        titre="Rappels de séance"
+        description="Une notification les jours où tu as prévu de t'entraîner"
+        valeur={preferences.rappels}
+        onChange={(v) => changer("rappels", v)}
       />
       <TogglePreference
-        titre="Ne casse pas ta serie 🔥"
-        description="Un rappel si tu es sur le point de perdre ta regularite"
-        valeur={serie}
-        onChange={setSerie}
+        titre="Ne casse pas ta série 🔥"
+        description="Un rappel si tu es sur le point de perdre ta régularité"
+        valeur={preferences.serie}
+        onChange={(v) => changer("serie", v)}
       />
       <TogglePreference
-        titre="Nouvelles videos"
-        description="Sois prevenue des qu'une nouvelle seance est publiee"
-        valeur={nouveautes}
-        onChange={setNouveautes}
+        titre="Nouvelles vidéos"
+        description="Sois prévenue dès qu'une nouvelle séance est publiée"
+        valeur={preferences.nouveautes}
+        onChange={(v) => changer("nouveautes", v)}
       />
       <TogglePreference
         titre="Newsletter"
         description="Actus, conseils et offres de Just In Form"
-        valeur={newsletter}
-        onChange={setNewsletter}
+        valeur={preferences.newsletter}
+        onChange={(v) => changer("newsletter", v)}
       />
       <p className="text-xs text-anthracite/40 pt-2">
-        Reglages non persistes pour l&apos;instant (maquette), a brancher avec
-        l&apos;envoi d&apos;emails/notifications plus tard.
+        L&apos;envoi effectif des emails/notifications arrivera avec le
+        système de paiement, mais tes préférences sont déjà sauvegardées.
       </p>
     </div>
   );
