@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { urlEmbedVimeo } from "@/lib/vimeo";
-import { CATEGORIES, RESSENTIS, type Video } from "@/lib/types";
+import { RESSENTIS, type Categorie, type Programme, type Video } from "@/lib/types";
 
 type FiltreDuree = "toutes" | "court" | "moyen" | "long";
 
@@ -73,6 +74,7 @@ function calculerSuggestionNiveau(
 
 export default function AppHome() {
   const [videos, setVideos] = useState<Video[]>([]);
+  const [categories, setCategories] = useState<Categorie[]>([]);
   const [chargement, setChargement] = useState(true);
   const [videoOuverte, setVideoOuverte] = useState<Video | null>(null);
   const [terminees, setTerminees] = useState<Set<string>>(new Set());
@@ -82,6 +84,7 @@ export default function AppHome() {
   >(new Map());
   const [filtreCategorie, setFiltreCategorie] = useState<string | null>(null);
   const [filtreDuree, setFiltreDuree] = useState<FiltreDuree>("toutes");
+  const [programmeLancement, setProgrammeLancement] = useState<Programme | null>(null);
 
   async function charger() {
     setChargement(true);
@@ -90,20 +93,34 @@ export default function AppHome() {
       data: { user },
     } = await supabase.auth.getUser();
 
-    const [{ data: videosData }, { data: seancesData }, { data: ressentisData }] =
-      await Promise.all([
-        supabase.from("videos").select("*").eq("statut", "publie").order("created_at", { ascending: false }),
-        user
-          ? supabase.from("seances_terminees").select("video_id, videos(niveau)").eq("user_id", user.id)
-          : Promise.resolve({ data: [] as { video_id: string; videos: { niveau: string } | null }[] }),
-        supabase.from("ressentis").select("video_id, valeur"),
-      ]);
+    const [
+      { data: videosData },
+      { data: seancesData },
+      { data: ressentisData },
+      { data: categoriesData },
+      { data: programmeLancementData },
+    ] = await Promise.all([
+      supabase.from("videos").select("*").eq("statut", "publie").order("created_at", { ascending: false }),
+      user
+        ? supabase.from("seances_terminees").select("video_id, videos(niveau)").eq("user_id", user.id)
+        : Promise.resolve({ data: [] as { video_id: string; videos: { niveau: string } | null }[] }),
+      supabase.from("ressentis").select("video_id, valeur"),
+      supabase.from("categories").select("*").order("ordre", { ascending: true }),
+      supabase
+        .from("programmes")
+        .select("*")
+        .eq("est_lancement", true)
+        .eq("statut", "publie")
+        .maybeSingle(),
+    ]);
 
     setVideos((videosData as Video[]) ?? []);
     const seances = (seancesData ?? []) as { video_id: string; videos: { niveau: string } | null }[];
     setTerminees(new Set(seances.map((s) => s.video_id)));
     setNiveauxSeances(seances.map((s) => s.videos?.niveau));
     setRessentiParVideo(calculerRessentiParVideo(ressentisData ?? []));
+    setCategories((categoriesData as Categorie[]) ?? []);
+    setProgrammeLancement((programmeLancementData as Programme) ?? null);
     setChargement(false);
   }
 
@@ -142,6 +159,23 @@ export default function AppHome() {
           </div>
         ) : (
           <>
+            {terminees.size === 0 && programmeLancement && (
+              <Link
+                href={`/app/programmes?programme=${programmeLancement.id}`}
+                className="block mb-6 rounded-2xl bg-orange-light p-5 hover:opacity-90"
+              >
+                <p className="text-sm font-medium text-framboise">
+                  🚀 Pour bien demarrer
+                </p>
+                <p className="font-semibold mt-1">{programmeLancement.titre}</p>
+                {programmeLancement.description && (
+                  <p className="text-sm text-anthracite/60 mt-1">
+                    {programmeLancement.description}
+                  </p>
+                )}
+              </Link>
+            )}
+
             {suggestionNiveau && (
               <button
                 onClick={() => setVideoOuverte(suggestionNiveau)}
@@ -185,17 +219,17 @@ export default function AppHome() {
               >
                 Toutes
               </button>
-              {CATEGORIES.map((c) => (
+              {categories.map((c) => (
                 <button
-                  key={c}
-                  onClick={() => setFiltreCategorie(c)}
+                  key={c.id}
+                  onClick={() => setFiltreCategorie(c.nom)}
                   className={`rounded-full px-3 py-1.5 text-sm border ${
-                    filtreCategorie === c
+                    filtreCategorie === c.nom
                       ? "bg-framboise text-white border-framboise"
                       : "bg-white text-anthracite/70 border-creme-dark"
                   }`}
                 >
-                  {c}
+                  {c.nom}
                 </button>
               ))}
             </div>
@@ -263,30 +297,36 @@ function CarteVideo({
   return (
     <button
       onClick={onClick}
-      className={`text-left rounded-2xl border p-4 transition ${
+      className={`text-left rounded-2xl border overflow-hidden transition ${
         accent
           ? "bg-framboise text-white border-framboise"
           : "bg-white border-creme-dark hover:border-framboise/50"
       }`}
     >
-      <div className="flex items-start justify-between">
-        <p className={`text-xs font-medium ${accent ? "text-white/80" : "text-framboise"}`}>
-          {video.categories?.join(" · ")}
+      {video.image_url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={video.image_url} alt="" className="w-full h-32 object-cover" />
+      )}
+      <div className="p-4">
+        <div className="flex items-start justify-between">
+          <p className={`text-xs font-medium ${accent ? "text-white/80" : "text-framboise"}`}>
+            {video.categories?.join(" · ")}
+          </p>
+          {terminee && (
+            <span className={`text-xs ${accent ? "text-white/70" : "text-anthracite/40"}`}>
+              ✓ Terminee
+            </span>
+          )}
+        </div>
+        <p className="font-semibold">{video.titre}</p>
+        <p className={`text-sm ${accent ? "text-white/70" : "text-anthracite/50"}`}>
+          {video.duree_min} min &middot; {video.niveau}
         </p>
-        {terminee && (
-          <span className={`text-xs ${accent ? "text-white/70" : "text-anthracite/40"}`}>
-            ✓ Terminee
-          </span>
-        )}
+        <p className={`text-xs mt-1 ${accent ? "text-white/70" : "text-anthracite/40"}`}>
+          {ressenti ? `${RESSENTIS[ressenti.valeur].emoji} ${RESSENTIS[ressenti.valeur].label}` : "Pas encore de ressenti"}
+          {ressenti ? ` (${ressenti.total})` : ""} &middot; {video.vues} vue{video.vues > 1 ? "s" : ""}
+        </p>
       </div>
-      <p className="font-semibold">{video.titre}</p>
-      <p className={`text-sm ${accent ? "text-white/70" : "text-anthracite/50"}`}>
-        {video.duree_min} min &middot; {video.niveau}
-      </p>
-      <p className={`text-xs mt-1 ${accent ? "text-white/70" : "text-anthracite/40"}`}>
-        {ressenti ? `${RESSENTIS[ressenti.valeur].emoji} ${RESSENTIS[ressenti.valeur].label}` : "Pas encore de ressenti"}
-        {ressenti ? ` (${ressenti.total})` : ""} &middot; {video.vues} vue{video.vues > 1 ? "s" : ""}
-      </p>
     </button>
   );
 }
@@ -353,6 +393,11 @@ export function LecteurVideo({
               <p className="text-sm text-anthracite/50">
                 {video.categories?.join(", ")} &middot; {video.duree_min} min
               </p>
+              {video.description && (
+                <p className="text-sm text-anthracite/70 mt-2 max-w-md">
+                  {video.description}
+                </p>
+              )}
             </div>
             <div className="flex gap-2">
               <button

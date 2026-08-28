@@ -1,6 +1,8 @@
 export type Video = {
   id: string;
   titre: string;
+  description: string | null;
+  image_url: string | null;
   categories: string[];
   duree_min: number;
   niveau: string;
@@ -8,6 +10,13 @@ export type Video = {
   statut: "publie" | "brouillon";
   est_vedette: boolean;
   vues: number;
+  created_at: string;
+};
+
+export type Categorie = {
+  id: string;
+  nom: string;
+  ordre: number;
   created_at: string;
 };
 
@@ -59,6 +68,7 @@ export type Programme = {
   titre: string;
   description: string;
   statut: "publie" | "brouillon";
+  est_lancement: boolean;
   created_at: string;
 };
 
@@ -69,17 +79,6 @@ export type ProgrammeVideo = {
   ordre: number;
   videos?: Pick<Video, "id" | "titre" | "categories" | "duree_min" | "niveau" | "vimeo_id">;
 };
-
-// Liste de reference des categories de cours, dans l'ordre d'affichage.
-export const CATEGORIES = [
-  "Echauffement",
-  "HIIT",
-  "Pilates",
-  "Animal Flow",
-  "Piloxing",
-  "Yoga",
-  "Mix",
-] as const;
 
 export const NIVEAUX = ["Tous niveaux", "Debutant", "Intermediaire", "Avance"] as const;
 

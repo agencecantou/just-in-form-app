@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Programme, ProgrammeVideo, Video } from "@/lib/types";
 import { LecteurVideo } from "../page";
 
-export default function ProgrammesPage() {
+function ProgrammesPageInterieur() {
+  const params = useSearchParams();
+  const programmeCible = params.get("programme");
+
   const [programmes, setProgrammes] = useState<Programme[]>([]);
   const [chargement, setChargement] = useState(true);
   const [programmeOuvert, setProgrammeOuvert] = useState<Programme | null>(null);
@@ -21,11 +25,20 @@ export default function ProgrammesPage() {
         .select("*")
         .eq("statut", "publie")
         .order("created_at", { ascending: false });
-      setProgrammes((data as Programme[]) ?? []);
+      const liste = (data as Programme[]) ?? [];
+      setProgrammes(liste);
       setChargement(false);
+
+      // Arrive via une bannière "programme de lancement" par exemple :
+      // on ouvre directement le bon programme.
+      if (programmeCible) {
+        const cible = liste.find((p) => p.id === programmeCible);
+        if (cible) ouvrirProgramme(cible);
+      }
     }
     charger();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [programmeCible]);
 
   async function ouvrirProgramme(programme: Programme) {
     setProgrammeOuvert(programme);
@@ -59,7 +72,10 @@ export default function ProgrammesPage() {
               onClick={() => ouvrirProgramme(p)}
               className="text-left rounded-2xl bg-white border border-creme-dark p-5 hover:border-framboise/50"
             >
-              <p className="font-semibold">{p.titre}</p>
+              <p className="font-semibold">
+                {p.titre}
+                {p.est_lancement && <span className="ml-2 text-xs text-orange">🚀 Pour bien demarrer</span>}
+              </p>
               <p className="text-sm text-anthracite/60 mt-1">{p.description}</p>
             </button>
           ))}
@@ -113,5 +129,13 @@ export default function ProgrammesPage() {
         />
       )}
     </main>
+  );
+}
+
+export default function ProgrammesPage() {
+  return (
+    <Suspense>
+      <ProgrammesPageInterieur />
+    </Suspense>
   );
 }

@@ -4,16 +4,18 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { extraireVimeoId } from "@/lib/vimeo";
 import {
-  CATEGORIES,
   NIVEAUX,
   type Avis,
+  type Categorie,
   type Programme,
   type ProgrammeVideo,
   type Video,
 } from "@/lib/types";
 
 export default function Admin() {
-  const [section, setSection] = useState<"videos" | "programmes" | "avis">("videos");
+  const [section, setSection] = useState<"videos" | "programmes" | "categories" | "avis">(
+    "videos"
+  );
 
   return (
     <div className="flex-1 flex flex-col sm:flex-row">
@@ -40,6 +42,16 @@ export default function Admin() {
           Programmes
         </button>
         <button
+          onClick={() => setSection("categories")}
+          className={`shrink-0 whitespace-nowrap text-left rounded-lg px-3 py-2 text-sm ${
+            section === "categories"
+              ? "bg-orange text-anthracite font-medium"
+              : "text-creme/70 hover:bg-white/10"
+          }`}
+        >
+          Categories
+        </button>
+        <button
           onClick={() => setSection("avis")}
           className={`shrink-0 whitespace-nowrap text-left rounded-lg px-3 py-2 text-sm ${
             section === "avis"
@@ -59,8 +71,150 @@ export default function Admin() {
 
       {section === "videos" && <SectionVideos />}
       {section === "programmes" && <SectionProgrammes />}
+      {section === "categories" && <SectionCategories />}
       {section === "avis" && <SectionAvis />}
     </div>
+  );
+}
+
+function SectionCategories() {
+  const [categories, setCategories] = useState<Categorie[]>([]);
+  const [chargement, setChargement] = useState(true);
+  const [nouveau, setNouveau] = useState("");
+  const [erreur, setErreur] = useState<string | null>(null);
+  const [renommage, setRenommage] = useState<{ id: string; nom: string } | null>(null);
+
+  async function charger() {
+    setChargement(true);
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("categories")
+      .select("*")
+      .order("ordre", { ascending: true });
+    setCategories((data as Categorie[]) ?? []);
+    setChargement(false);
+  }
+
+  useEffect(() => {
+    charger();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function ajouter() {
+    if (!nouveau.trim()) return;
+    setErreur(null);
+    const supabase = createClient();
+    const ordreMax = categories.reduce((m, c) => Math.max(m, c.ordre), -1);
+    const { error } = await supabase
+      .from("categories")
+      .insert({ nom: nouveau.trim(), ordre: ordreMax + 1 });
+    if (error) {
+      setErreur(error.message);
+      return;
+    }
+    setNouveau("");
+    charger();
+  }
+
+  async function renommer() {
+    if (!renommage || !renommage.nom.trim()) return;
+    const supabase = createClient();
+    await supabase
+      .from("categories")
+      .update({ nom: renommage.nom.trim() })
+      .eq("id", renommage.id);
+    setRenommage(null);
+    charger();
+  }
+
+  async function supprimer(id: string) {
+    const supabase = createClient();
+    await supabase.from("categories").delete().eq("id", id);
+    charger();
+  }
+
+  return (
+    <main className="flex-1 px-6 py-8 max-w-2xl">
+      <h1 className="text-2xl font-semibold mb-1">Categories</h1>
+      <p className="text-anthracite/60 mb-6">
+        Gere la liste des categories utilisees pour classer les videos, sans
+        avoir besoin de repasser par le developpement.
+      </p>
+
+      <div className="rounded-2xl bg-white border border-creme-dark p-5 mb-6 flex gap-3">
+        <input
+          value={nouveau}
+          onChange={(e) => setNouveau(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && ajouter()}
+          placeholder="Nouvelle categorie (ex : Renforcement)"
+          className="flex-1 rounded-lg border border-creme-dark px-3 py-2 text-sm"
+        />
+        <button
+          onClick={ajouter}
+          className="rounded-full bg-framboise text-white px-5 py-2 text-sm font-semibold"
+        >
+          Ajouter
+        </button>
+      </div>
+      {erreur && <p className="text-sm text-framboise mb-4">{erreur}</p>}
+
+      {chargement ? (
+        <p className="text-sm text-anthracite/50">Chargement...</p>
+      ) : categories.length === 0 ? (
+        <p className="text-sm text-anthracite/50">Aucune categorie pour le moment.</p>
+      ) : (
+        <div className="space-y-2">
+          {categories.map((c) => (
+            <div
+              key={c.id}
+              className="rounded-xl bg-white border border-creme-dark p-3 flex items-center justify-between gap-3"
+            >
+              {renommage?.id === c.id ? (
+                <input
+                  autoFocus
+                  value={renommage.nom}
+                  onChange={(e) => setRenommage({ id: c.id, nom: e.target.value })}
+                  onKeyDown={(e) => e.key === "Enter" && renommer()}
+                  className="flex-1 rounded-lg border border-creme-dark px-2 py-1 text-sm"
+                />
+              ) : (
+                <p className="text-sm font-medium">{c.nom}</p>
+              )}
+              <div className="flex items-center gap-3 shrink-0">
+                {renommage?.id === c.id ? (
+                  <>
+                    <button onClick={renommer} className="text-xs underline text-framboise">
+                      Valider
+                    </button>
+                    <button
+                      onClick={() => setRenommage(null)}
+                      className="text-xs underline text-anthracite/40"
+                    >
+                      Annuler
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => setRenommage({ id: c.id, nom: c.nom })}
+                      className="text-xs underline text-anthracite/60"
+                    >
+                      Renommer
+                    </button>
+                    <button
+                      onClick={() => supprimer(c.id)}
+                      className="text-xs underline text-anthracite/40"
+                    >
+                      Supprimer
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </main>
   );
 }
 
@@ -119,11 +273,17 @@ function SectionAvis() {
 
 function SectionVideos() {
   const [videos, setVideos] = useState<Video[]>([]);
+  const [categories, setCategories] = useState<Categorie[]>([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
 
   const [titre, setTitre] = useState("");
+  const [description, setDescription] = useState("");
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [banqueOuverte, setBanqueOuverte] = useState(false);
+  const [banqueImages, setBanqueImages] = useState<string[]>([]);
+  const [uploadEnCours, setUploadEnCours] = useState(false);
   const [categoriesSelectionnees, setCategoriesSelectionnees] = useState<string[]>([]);
   const [dureeMin, setDureeMin] = useState(20);
   const [niveau, setNiveau] = useState<string>(NIVEAUX[0]);
@@ -134,13 +294,14 @@ function SectionVideos() {
   async function chargerVideos() {
     setChargement(true);
     const supabase = createClient();
-    const { data, error } = await supabase
-      .from("videos")
-      .select("*")
-      .order("created_at", { ascending: false });
+    const [{ data, error }, { data: cats }] = await Promise.all([
+      supabase.from("videos").select("*").order("created_at", { ascending: false }),
+      supabase.from("categories").select("*").order("ordre", { ascending: true }),
+    ]);
 
     if (error) setErreur(error.message);
     else setVideos(data as Video[]);
+    setCategories((cats as Categorie[]) ?? []);
     setChargement(false);
   }
 
@@ -148,6 +309,35 @@ function SectionVideos() {
     chargerVideos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function ouvrirBanque() {
+    setBanqueOuverte(true);
+    const supabase = createClient();
+    const { data } = await supabase.storage.from("images").list("videos", {
+      sortBy: { column: "created_at", order: "desc" },
+    });
+    const urls = (data ?? [])
+      .filter((f) => f.name)
+      .map(
+        (f) => supabase.storage.from("images").getPublicUrl(`videos/${f.name}`).data.publicUrl
+      );
+    setBanqueImages(urls);
+  }
+
+  async function uploaderImage(fichier: File) {
+    setUploadEnCours(true);
+    setErreur(null);
+    const supabase = createClient();
+    const chemin = `videos/${Date.now()}-${fichier.name.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`;
+    const { error } = await supabase.storage.from("images").upload(chemin, fichier);
+    setUploadEnCours(false);
+    if (error) {
+      setErreur(error.message);
+      return;
+    }
+    const { data } = supabase.storage.from("images").getPublicUrl(chemin);
+    setImageUrl(data.publicUrl);
+  }
 
   function toggleCategorie(cat: string) {
     setCategoriesSelectionnees((prev) =>
@@ -157,6 +347,8 @@ function SectionVideos() {
 
   function reinitialiserFormulaire() {
     setTitre("");
+    setDescription("");
+    setImageUrl(null);
     setLienVimeo("");
     setDureeMin(20);
     setCategoriesSelectionnees([]);
@@ -167,6 +359,8 @@ function SectionVideos() {
   function commencerEdition(video: Video) {
     setVideoEnEdition(video);
     setTitre(video.titre);
+    setDescription(video.description ?? "");
+    setImageUrl(video.image_url ?? null);
     setCategoriesSelectionnees(video.categories ?? []);
     setDureeMin(video.duree_min);
     setNiveau(video.niveau);
@@ -201,6 +395,8 @@ function SectionVideos() {
     const supabase = createClient();
     const donnees = {
       titre: titre.trim(),
+      description: description.trim() || null,
+      image_url: imageUrl,
       categories: categoriesSelectionnees,
       duree_min: dureeMin,
       niveau,
@@ -264,21 +460,122 @@ function SectionVideos() {
             Categories <span className="text-anthracite/40 font-normal">(plusieurs possibles, ex : Mix)</span>
           </label>
           <div className="mt-2 flex flex-wrap gap-2">
-            {CATEGORIES.map((c) => (
+            {categories.length === 0 && (
+              <p className="text-xs text-anthracite/50">
+                Aucune categorie, cree-les d&apos;abord dans l&apos;onglet Categories.
+              </p>
+            )}
+            {categories.map((c) => (
               <button
                 type="button"
-                key={c}
-                onClick={() => toggleCategorie(c)}
+                key={c.id}
+                onClick={() => toggleCategorie(c.nom)}
                 className={`rounded-full px-3 py-1.5 text-sm border ${
-                  categoriesSelectionnees.includes(c)
+                  categoriesSelectionnees.includes(c.nom)
                     ? "bg-framboise text-white border-framboise"
                     : "bg-white text-anthracite/70 border-creme-dark"
                 }`}
               >
-                {c}
+                {c.nom}
               </button>
             ))}
           </div>
+        </div>
+
+        <div>
+          <label className="text-sm font-medium">
+            Description <span className="text-anthracite/40 font-normal">(visible par l&apos;abonnee)</span>
+          </label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+            placeholder="Ce que contient la video, le materiel necessaire, les points d'attention..."
+            className="mt-1 w-full rounded-lg border border-creme-dark px-3 py-2 text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-medium">Image</label>
+          <div className="mt-2 flex items-center gap-3 flex-wrap">
+            {imageUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={imageUrl}
+                alt=""
+                className="w-20 h-20 rounded-lg object-cover border border-creme-dark"
+              />
+            )}
+            <label className="rounded-full border border-creme-dark px-4 py-2 text-sm cursor-pointer hover:border-framboise/50">
+              {uploadEnCours ? "Envoi..." : "Envoyer une image"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploadEnCours}
+                onChange={(e) => {
+                  const fichier = e.target.files?.[0];
+                  if (fichier) uploaderImage(fichier);
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={ouvrirBanque}
+              className="rounded-full border border-creme-dark px-4 py-2 text-sm hover:border-framboise/50"
+            >
+              Choisir dans la banque
+            </button>
+            {imageUrl && (
+              <button
+                type="button"
+                onClick={() => setImageUrl(null)}
+                className="text-xs underline text-anthracite/40"
+              >
+                Retirer
+              </button>
+            )}
+          </div>
+
+          {banqueOuverte && (
+            <div className="mt-3 rounded-xl border border-creme-dark p-3">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-medium text-anthracite/60">
+                  Images deja envoyees
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setBanqueOuverte(false)}
+                  className="text-xs underline text-anthracite/40"
+                >
+                  Fermer
+                </button>
+              </div>
+              {banqueImages.length === 0 ? (
+                <p className="text-xs text-anthracite/50">
+                  Aucune image envoyee pour l&apos;instant.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {banqueImages.map((url) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={url}
+                      src={url}
+                      alt=""
+                      onClick={() => {
+                        setImageUrl(url);
+                        setBanqueOuverte(false);
+                      }}
+                      className={`w-16 h-16 rounded-lg object-cover border cursor-pointer ${
+                        imageUrl === url ? "border-framboise" : "border-creme-dark"
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -431,6 +728,7 @@ function SectionProgrammes() {
 
   const [titre, setTitre] = useState("");
   const [description, setDescription] = useState("");
+  const [estLancement, setEstLancement] = useState(false);
 
   async function chargerTout() {
     setChargement(true);
@@ -466,18 +764,35 @@ function SectionProgrammes() {
   async function creerProgramme() {
     if (!titre.trim()) return;
     const supabase = createClient();
+    if (estLancement) {
+      await supabase.from("programmes").update({ est_lancement: false }).eq("est_lancement", true);
+    }
     const { data } = await supabase
       .from("programmes")
-      .insert({ titre: titre.trim(), description: description.trim() })
+      .insert({ titre: titre.trim(), description: description.trim(), est_lancement: estLancement })
       .select()
       .single();
     setTitre("");
     setDescription("");
+    setEstLancement(false);
     await chargerTout();
     if (data) {
       setProgrammeActifId(data.id);
       chargerVideosDuProgramme(data.id);
     }
+  }
+
+  // Un seul programme de lancement a la fois : on decoche les autres avant
+  // de cocher celui-ci.
+  async function definirCommeLancement(programme: Programme) {
+    const supabase = createClient();
+    if (!programme.est_lancement) {
+      await supabase.from("programmes").update({ est_lancement: false }).eq("est_lancement", true);
+      await supabase.from("programmes").update({ est_lancement: true }).eq("id", programme.id);
+    } else {
+      await supabase.from("programmes").update({ est_lancement: false }).eq("id", programme.id);
+    }
+    chargerTout();
   }
 
   async function changerStatutProgramme(programme: Programme) {
@@ -546,6 +861,17 @@ function SectionProgrammes() {
           rows={2}
           className="w-full rounded-lg border border-creme-dark px-3 py-2 text-sm"
         />
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={estLancement}
+            onChange={(e) => setEstLancement(e.target.checked)}
+          />
+          Programme de lancement{" "}
+          <span className="text-anthracite/40">
+            (propose automatiquement a toute personne qui n&apos;a encore termine aucune seance)
+          </span>
+        </label>
         <button
           onClick={creerProgramme}
           className="rounded-full bg-framboise text-white px-5 py-2 text-sm font-semibold"
@@ -575,7 +901,12 @@ function SectionProgrammes() {
                     : "border-creme-dark bg-white"
                 }`}
               >
-                <p className="font-medium text-sm">{p.titre}</p>
+                <p className="font-medium text-sm">
+                  {p.titre}
+                  {p.est_lancement && (
+                    <span className="ml-2 text-xs text-orange">🚀 Lancement</span>
+                  )}
+                </p>
                 <span
                   className={`text-xs ${
                     p.statut === "publie" ? "text-framboise" : "text-anthracite/40"
@@ -596,10 +927,23 @@ function SectionProgrammes() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-semibold">{programmeActif.titre}</p>
+                    <p className="font-semibold">
+                      {programmeActif.titre}
+                      {programmeActif.est_lancement && (
+                        <span className="ml-2 text-xs text-orange">🚀 Lancement</span>
+                      )}
+                    </p>
                     <p className="text-sm text-anthracite/50">{programmeActif.description}</p>
                   </div>
                   <div className="flex gap-2">
+                    <button
+                      onClick={() => definirCommeLancement(programmeActif)}
+                      className="text-xs underline text-anthracite/60"
+                    >
+                      {programmeActif.est_lancement
+                        ? "Retirer du lancement"
+                        : "Definir comme lancement"}
+                    </button>
                     <button
                       onClick={() => changerStatutProgramme(programmeActif)}
                       className="text-xs underline text-anthracite/60"
