@@ -15,13 +15,23 @@ import {
 
 export default function Admin() {
   const [section, setSection] = useState<
-    "videos" | "programmes" | "categories" | "comptes" | "avis"
-  >("videos");
+    "statistiques" | "videos" | "programmes" | "categories" | "comptes" | "avis"
+  >("statistiques");
 
   return (
     <div className="flex-1 flex flex-col sm:flex-row">
       <aside className="flex flex-row sm:flex-col gap-1 sm:w-56 overflow-x-auto bg-anthracite text-creme px-3 sm:px-4 py-3 sm:py-6">
         <p className="hidden sm:block mb-4 px-2 text-lg font-semibold">Espace coach</p>
+        <button
+          onClick={() => setSection("statistiques")}
+          className={`shrink-0 whitespace-nowrap text-left rounded-lg px-3 py-2 text-sm ${
+            section === "statistiques"
+              ? "bg-orange text-anthracite font-medium"
+              : "text-creme/70 hover:bg-white/10"
+          }`}
+        >
+          Statistiques
+        </button>
         <button
           onClick={() => setSection("videos")}
           className={`shrink-0 whitespace-nowrap text-left rounded-lg px-3 py-2 text-sm ${
@@ -80,12 +90,140 @@ export default function Admin() {
         </a>
       </aside>
 
+      {section === "statistiques" && <SectionStatistiques />}
       {section === "videos" && <SectionVideos />}
       {section === "programmes" && <SectionProgrammes />}
       {section === "categories" && <SectionCategories />}
       {section === "comptes" && <SectionComptes />}
       {section === "avis" && <SectionAvis />}
     </div>
+  );
+}
+
+// Le lundi de la semaine contenant `date`.
+function lundiDeLaSemaine(date: Date) {
+  const d = new Date(date);
+  const jour = d.getDay(); // 0 = dimanche
+  const decalage = jour === 0 ? -6 : 1 - jour;
+  d.setDate(d.getDate() + decalage);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function formaterDureeStat(minutes: number) {
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, "0")}`;
+}
+
+function SectionStatistiques() {
+  const [chargement, setChargement] = useState(true);
+  const [nbAbonnees, setNbAbonnees] = useState(0);
+  const [nbVideosPubliees, setNbVideosPubliees] = useState(0);
+  const [seancesTotal, setSeancesTotal] = useState(0);
+  const [minutesTotal, setMinutesTotal] = useState(0);
+  const [seancesSemaine, setSeancesSemaine] = useState(0);
+  const [minutesSemaine, setMinutesSemaine] = useState(0);
+  const [abonneesActivesSemaine, setAbonneesActivesSemaine] = useState(0);
+  const [videoPlusVue, setVideoPlusVue] = useState<{ titre: string; vues: number } | null>(null);
+
+  useEffect(() => {
+    async function charger() {
+      setChargement(true);
+      const supabase = createClient();
+      const [{ data: profils }, { count: nbVideos }, { data: seances }, { data: videosTop }] =
+        await Promise.all([
+          supabase.from("profiles").select("id").eq("role", "abonnee"),
+          supabase.from("videos").select("id", { count: "exact", head: true }).eq("statut", "publie"),
+          supabase.from("seances_terminees").select("user_id, termine_le, videos(duree_min)"),
+          supabase.from("videos").select("titre, vues").order("vues", { ascending: false }).limit(1),
+        ]);
+
+      setNbAbonnees((profils ?? []).length);
+      setNbVideosPubliees(nbVideos ?? 0);
+
+      type SeanceLigne = { user_id: string; termine_le: string; videos: { duree_min: number } | null };
+      const liste = ((seances ?? []) as unknown as SeanceLigne[]).filter((s) => s.user_id);
+      setSeancesTotal(liste.length);
+      setMinutesTotal(liste.reduce((total, s) => total + (s.videos?.duree_min ?? 0), 0));
+
+      const lundi = lundiDeLaSemaine(new Date());
+      const deLaSemaine = liste.filter((s) => new Date(s.termine_le) >= lundi);
+      setSeancesSemaine(deLaSemaine.length);
+      setMinutesSemaine(deLaSemaine.reduce((total, s) => total + (s.videos?.duree_min ?? 0), 0));
+      setAbonneesActivesSemaine(new Set(deLaSemaine.map((s) => s.user_id)).size);
+
+      const top = ((videosTop ?? []) as { titre: string; vues: number }[])[0];
+      setVideoPlusVue(top ?? null);
+
+      setChargement(false);
+    }
+    charger();
+  }, []);
+
+  const tauxEngagement = nbAbonnees > 0 ? Math.round((abonneesActivesSemaine / nbAbonnees) * 100) : 0;
+
+  return (
+    <main className="flex-1 px-6 py-8 max-w-4xl">
+      <h1 className="text-2xl font-semibold mb-1">Statistiques</h1>
+      <p className="text-anthracite/60 mb-6">
+        De quoi suivre l&apos;activite et avoir des chiffres concrets a partager.
+      </p>
+
+      {chargement ? (
+        <p className="text-sm text-anthracite/50">Chargement...</p>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+            <div className="rounded-2xl bg-white border border-creme-dark p-4">
+              <p className="text-2xl font-semibold text-framboise">{nbAbonnees}</p>
+              <p className="text-xs text-anthracite/50 mt-1">abonnees</p>
+            </div>
+            <div className="rounded-2xl bg-white border border-creme-dark p-4">
+              <p className="text-2xl font-semibold text-framboise">{nbVideosPubliees}</p>
+              <p className="text-xs text-anthracite/50 mt-1">videos publiees</p>
+            </div>
+            <div className="rounded-2xl bg-white border border-creme-dark p-4">
+              <p className="text-2xl font-semibold text-framboise">{seancesTotal}</p>
+              <p className="text-xs text-anthracite/50 mt-1">seances realisees (total)</p>
+            </div>
+            <div className="rounded-2xl bg-white border border-creme-dark p-4">
+              <p className="text-2xl font-semibold text-framboise">{formaterDureeStat(minutesTotal)}</p>
+              <p className="text-xs text-anthracite/50 mt-1">de visionnage (total)</p>
+            </div>
+          </div>
+
+          <h2 className="text-sm font-semibold text-anthracite/60 mb-3">Cette semaine (depuis lundi)</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
+            <div className="rounded-2xl bg-white border border-creme-dark p-4">
+              <p className="text-2xl font-semibold text-framboise">{seancesSemaine}</p>
+              <p className="text-xs text-anthracite/50 mt-1">seances realisees</p>
+            </div>
+            <div className="rounded-2xl bg-white border border-creme-dark p-4">
+              <p className="text-2xl font-semibold text-framboise">{formaterDureeStat(minutesSemaine)}</p>
+              <p className="text-xs text-anthracite/50 mt-1">de visionnage</p>
+            </div>
+            <div className="rounded-2xl bg-white border border-creme-dark p-4">
+              <p className="text-2xl font-semibold text-framboise">{tauxEngagement}%</p>
+              <p className="text-xs text-anthracite/50 mt-1">
+                abonnees actives ({abonneesActivesSemaine}/{nbAbonnees})
+              </p>
+            </div>
+          </div>
+
+          {videoPlusVue && (
+            <div className="rounded-2xl bg-orange-light p-5">
+              <p className="text-sm font-medium text-framboise">🏆 Video la plus regardee</p>
+              <p className="font-semibold mt-1">{videoPlusVue.titre}</p>
+              <p className="text-sm text-anthracite/60">
+                {videoPlusVue.vues} vue{videoPlusVue.vues > 1 ? "s" : ""}
+              </p>
+            </div>
+          )}
+        </>
+      )}
+    </main>
   );
 }
 

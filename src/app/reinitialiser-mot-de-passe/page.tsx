@@ -81,7 +81,8 @@ function PageInterieure() {
   return (
     <div className="flex-1 flex items-center justify-center px-6 py-16">
       <div className="w-full max-w-sm">
-        <h1 className="text-2xl font-semibold text-center mb-1">Just In Form</h1>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.png" alt="Just In Form" className="h-16 w-auto mx-auto mb-1" />
         <p className="text-center text-anthracite/60 mb-8">
           Nouveau mot de passe
         </p>

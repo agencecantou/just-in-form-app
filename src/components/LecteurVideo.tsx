@@ -10,6 +10,13 @@ import { RESSENTIS, type Video } from "@/lib/types";
 const SEUIL_REPRISE_SECONDES = 5;
 const INTERVALLE_SAUVEGARDE_MS = 5000;
 
+function formaterTemps(secondes: number) {
+  const s = Math.max(0, Math.round(secondes));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${String(r).padStart(2, "0")}`;
+}
+
 export default function LecteurVideo({
   video,
   onFermer,
@@ -24,15 +31,41 @@ export default function LecteurVideo({
   const [messageAvis, setMessageAvis] = useState("");
   const [envoi, setEnvoi] = useState(false);
 
+  // Etat du lecteur custom (les controles natifs Vimeo sont masques).
+  const [enLecture, setEnLecture] = useState(false);
+  const [positionAffichee, setPositionAffichee] = useState(0);
+  const [dureeSecondes, setDureeSecondes] = useState(video.duree_min * 60);
+  const [favori, setFavori] = useState(false);
+  const [pleinEcran, setPleinEcran] = useState(false);
+
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const conteneurRef = useRef<HTMLDivElement>(null);
+  const barreRef = useRef<HTMLDivElement>(null);
   const derniereSauvegardeRef = useRef(0);
   const positionRef = useRef(0);
   const positionDepartRef = useRef(0);
   const userIdRef = useRef<string | null>(null);
   const dejaMarqueeRef = useRef(false);
+  const glissementRef = useRef(false);
+  // La position sauvegardee peut arriver avant ou apres l'evenement "ready"
+  // du lecteur Vimeo (selon la vitesse du reseau) : on ne tente le seek que
+  // quand les deux sont prets, et une seule fois.
+  const lecteurPretRef = useRef(false);
+  const positionChargeeRef = useRef(false);
+  const repriseEnvoyeeRef = useRef(false);
 
-  // Recupere l'utilisateur, incremente les vues et charge une eventuelle
-  // reprise (derniere position enregistree pour cette video).
+  function tenterReprise() {
+    if (!lecteurPretRef.current || !positionChargeeRef.current || repriseEnvoyeeRef.current) return;
+    repriseEnvoyeeRef.current = true;
+    if (positionDepartRef.current > SEUIL_REPRISE_SECONDES) {
+      envoyer({ method: "setCurrentTime", value: positionDepartRef.current });
+      setPositionAffichee(positionDepartRef.current);
+      positionRef.current = positionDepartRef.current;
+    }
+  }
+
+  // Recupere l'utilisateur, incremente les vues, charge une eventuelle
+  // reprise et l'etat favori pour cette video.
   useEffect(() => {
     const supabase = createClient();
 
@@ -45,29 +78,40 @@ export default function LecteurVideo({
       supabase.rpc("increment_vues", { p_video_id: video.id }).then(() => {});
 
       if (user) {
-        const { data } = await supabase
-          .from("progression_videos")
-          .select("position_secondes")
-          .eq("user_id", user.id)
-          .eq("video_id", video.id)
-          .maybeSingle();
-        if (data?.position_secondes) {
-          positionDepartRef.current = data.position_secondes;
+        const [{ data: progression }, { data: favorisData }] = await Promise.all([
+          supabase
+            .from("progression_videos")
+            .select("position_secondes")
+            .eq("user_id", user.id)
+            .eq("video_id", video.id)
+            .maybeSingle(),
+          supabase
+            .from("favoris")
+            .select("id")
+            .eq("user_id", user.id)
+            .eq("video_id", video.id)
+            .maybeSingle(),
+        ]);
+        if (progression?.position_secondes) {
+          positionDepartRef.current = progression.position_secondes;
         }
+        setFavori(!!favorisData);
       }
+      positionChargeeRef.current = true;
+      tenterReprise();
     }
     init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [video.id]);
 
   // Ecoute les evenements du lecteur Vimeo (protocole postMessage officiel,
-  // pas besoin de librairie externe) : pret, avancement, fin de lecture.
+  // pas besoin de librairie externe) : pret, avancement, lecture/pause, fin.
   useEffect(() => {
     function onMessage(e: MessageEvent) {
       if (e.origin !== "https://player.vimeo.com") return;
       if (!iframeRef.current || e.source !== iframeRef.current.contentWindow) return;
 
-      let data: { event?: string; data?: { seconds?: number } };
+      let data: { event?: string; method?: string; value?: number; data?: { seconds?: number } };
       try {
         data = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
       } catch {
@@ -77,19 +121,29 @@ export default function LecteurVideo({
       if (data.event === "ready") {
         envoyer({ method: "addEventListener", value: "timeupdate" });
         envoyer({ method: "addEventListener", value: "ended" });
-        if (positionDepartRef.current > SEUIL_REPRISE_SECONDES) {
-          envoyer({ method: "setCurrentTime", value: positionDepartRef.current });
-        }
+        envoyer({ method: "addEventListener", value: "play" });
+        envoyer({ method: "addEventListener", value: "pause" });
+        envoyer({ method: "getDuration" });
+        lecteurPretRef.current = true;
+        tenterReprise();
+      }
+
+      if (data.method === "getDuration" && typeof data.value === "number" && data.value > 0) {
+        setDureeSecondes(data.value);
       }
 
       if (data.event === "timeupdate" && data.data?.seconds !== undefined) {
         positionRef.current = data.data.seconds;
+        if (!glissementRef.current) setPositionAffichee(data.data.seconds);
         const maintenant = Date.now();
         if (maintenant - derniereSauvegardeRef.current > INTERVALLE_SAUVEGARDE_MS) {
           derniereSauvegardeRef.current = maintenant;
           sauvegarderPosition(data.data.seconds);
         }
       }
+
+      if (data.event === "play") setEnLecture(true);
+      if (data.event === "pause") setEnLecture(false);
 
       if (data.event === "ended") {
         marquerCommeTerminee();
@@ -99,6 +153,15 @@ export default function LecteurVideo({
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Suit le plein ecran reel du navigateur (bouton custom, touche Echap, etc.)
+  useEffect(() => {
+    function onChange() {
+      setPleinEcran(document.fullscreenElement === conteneurRef.current);
+    }
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
 
   function envoyer(message: Record<string, unknown>) {
@@ -122,9 +185,10 @@ export default function LecteurVideo({
     );
   }
 
-  // Utilisee a la fois par le bouton "Marquer comme terminee" et par la fin
+  // Utilisee a la fois par le bouton "Terminer la seance" et par la fin
   // naturelle de la video (evenement "ended") : idempotente via la ref.
   async function marquerCommeTerminee() {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     if (dejaMarqueeRef.current) {
       setEtape("ressenti");
       return;
@@ -162,12 +226,71 @@ export default function LecteurVideo({
   }
 
   function fermer() {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     if (positionRef.current > SEUIL_REPRISE_SECONDES && !dejaMarqueeRef.current) {
       sauvegarderPosition(positionRef.current);
     }
     onTerminee();
     onFermer();
   }
+
+  function togglerLecture() {
+    envoyer({ method: enLecture ? "pause" : "play" });
+  }
+
+  async function togglerFavori() {
+    if (!userIdRef.current) return;
+    const supabase = createClient();
+    const nouvelEtat = !favori;
+    setFavori(nouvelEtat);
+    if (nouvelEtat) {
+      await supabase.from("favoris").insert({ user_id: userIdRef.current, video_id: video.id });
+    } else {
+      await supabase
+        .from("favoris")
+        .delete()
+        .eq("user_id", userIdRef.current)
+        .eq("video_id", video.id);
+    }
+  }
+
+  function togglerPleinEcran() {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      conteneurRef.current?.requestFullscreen().catch(() => {});
+    }
+  }
+
+  function positionDepuisPointeur(clientX: number) {
+    const el = barreRef.current;
+    if (!el || dureeSecondes <= 0) return 0;
+    const rect = el.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    return ratio * dureeSecondes;
+  }
+
+  function onBarrePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    glissementRef.current = true;
+    setPositionAffichee(positionDepuisPointeur(e.clientX));
+  }
+
+  function onBarrePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!glissementRef.current) return;
+    setPositionAffichee(positionDepuisPointeur(e.clientX));
+  }
+
+  function onBarrePointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (!glissementRef.current) return;
+    glissementRef.current = false;
+    const nouvelle = positionDepuisPointeur(e.clientX);
+    positionRef.current = nouvelle;
+    envoyer({ method: "setCurrentTime", value: nouvelle });
+    sauvegarderPosition(nouvelle);
+  }
+
+  const progressionPct = dureeSecondes > 0 ? Math.min(100, (positionAffichee / dureeSecondes) * 100) : 0;
 
   return (
     <div
@@ -177,14 +300,79 @@ export default function LecteurVideo({
       }}
     >
       <div className="bg-white rounded-2xl overflow-hidden max-w-2xl w-full">
-        <div className="aspect-video bg-anthracite">
+        <div ref={conteneurRef} className="relative aspect-video bg-anthracite">
           <iframe
             ref={iframeRef}
-            src={`${urlEmbedVimeo(video.vimeo_id)}?api=1&player_id=jif-player`}
-            className="w-full h-full"
-            allow="autoplay; fullscreen; picture-in-picture"
-            allowFullScreen
+            src={`${urlEmbedVimeo(video.vimeo_id)}?api=1&player_id=jif-player&controls=0&title=0&byline=0&portrait=0`}
+            className="w-full h-full pointer-events-none"
+            allow="autoplay; picture-in-picture"
           />
+
+          {/* Overlay custom (clic = play/pause) */}
+          <div
+            className="absolute inset-0 flex flex-col justify-end"
+            onClick={togglerLecture}
+          >
+            {!enLecture && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="h-16 w-16 rounded-full bg-white/90 flex items-center justify-center text-2xl text-anthracite">
+                  ▶
+                </span>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                togglerFavori();
+              }}
+              className="absolute top-3 right-3 h-9 w-9 rounded-full bg-anthracite/50 flex items-center justify-center text-lg"
+              aria-label="Favori"
+            >
+              {favori ? "❤️" : "🤍"}
+            </button>
+
+            <div
+              className="bg-gradient-to-t from-anthracite/90 to-transparent px-3 pb-3 pt-8 flex flex-col gap-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                ref={barreRef}
+                onPointerDown={onBarrePointerDown}
+                onPointerMove={onBarrePointerMove}
+                onPointerUp={onBarrePointerUp}
+                className="h-1.5 bg-white/30 rounded-full cursor-pointer relative touch-none"
+              >
+                <div
+                  className="h-full bg-orange rounded-full"
+                  style={{ width: `${progressionPct}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-white text-xs">
+                <div className="flex items-center gap-3">
+                  <button type="button" onClick={togglerLecture} className="text-base">
+                    {enLecture ? "⏸" : "▶"}
+                  </button>
+                  <span className="text-white/70">
+                    {formaterTemps(positionAffichee)} / {formaterTemps(dureeSecondes)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={marquerCommeTerminee}
+                    className="rounded-full bg-framboise px-3 py-1 text-xs font-semibold"
+                  >
+                    ✓ Terminer
+                  </button>
+                  <button type="button" onClick={togglerPleinEcran} className="text-base">
+                    {pleinEcran ? "⤡" : "⤢"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {etape === "lecture" ? (

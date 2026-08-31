@@ -71,6 +71,8 @@ export default function SeancesPage() {
   const [filtreMateriel, setFiltreMateriel] = useState<FiltreMateriel>("tous");
   const [filtreZone, setFiltreZone] = useState<string | null>(null);
   const [cacherTerminees, setCacherTerminees] = useState(false);
+  const [afficherFavorisSeulement, setAfficherFavorisSeulement] = useState(false);
+  const [favoris, setFavoris] = useState<Set<string>>(new Set());
 
   async function charger() {
     setChargement(true);
@@ -85,6 +87,7 @@ export default function SeancesPage() {
       { data: ressentisData },
       { data: categoriesData },
       { data: progressionData },
+      { data: favorisData },
     ] = await Promise.all([
       supabase.from("videos").select("*").eq("statut", "publie").order("created_at", { ascending: false }),
       user
@@ -95,6 +98,9 @@ export default function SeancesPage() {
       user
         ? supabase.from("progression_videos").select("video_id, position_secondes").eq("user_id", user.id)
         : Promise.resolve({ data: [] as { video_id: string; position_secondes: number }[] }),
+      user
+        ? supabase.from("favoris").select("video_id").eq("user_id", user.id)
+        : Promise.resolve({ data: [] as { video_id: string }[] }),
     ]);
 
     const toutesVideos = (videosData as Video[]) ?? [];
@@ -112,6 +118,7 @@ export default function SeancesPage() {
       }
     }
     setProgressionParVideo(progressionMap);
+    setFavoris(new Set(((favorisData ?? []) as { video_id: string }[]).map((f) => f.video_id)));
 
     setChargement(false);
   }
@@ -128,7 +135,8 @@ export default function SeancesPage() {
       (!filtreZone || v.zones_corps?.includes(filtreZone)) &&
       correspondDuree(v, filtreDuree) &&
       correspondMateriel(v, filtreMateriel) &&
-      (!cacherTerminees || !terminees.has(v.id))
+      (!cacherTerminees || !terminees.has(v.id)) &&
+      (!afficherFavorisSeulement || favoris.has(v.id))
   );
 
   return (
@@ -173,7 +181,7 @@ export default function SeancesPage() {
                 onClick={() => setFiltreDuree(f.valeur)}
                 className={`rounded-full px-3 py-1.5 text-xs border ${
                   filtreDuree === f.valeur
-                    ? "bg-orange text-anthracite border-orange font-medium"
+                    ? "bg-framboise-light text-framboise border-framboise-light font-medium"
                     : "bg-white text-anthracite/60 border-creme-dark"
                 }`}
               >
@@ -195,7 +203,7 @@ export default function SeancesPage() {
                 onClick={() => setFiltreMateriel(f.valeur)}
                 className={`rounded-full px-3 py-1.5 text-xs border ${
                   filtreMateriel === f.valeur
-                    ? "bg-orange text-anthracite border-orange font-medium"
+                    ? "bg-framboise-light text-framboise border-framboise-light font-medium"
                     : "bg-white text-anthracite/60 border-creme-dark"
                 }`}
               >
@@ -230,14 +238,45 @@ export default function SeancesPage() {
             ))}
           </div>
 
-          <label className="mb-6 flex items-center gap-2 text-sm text-anthracite/70">
-            <input
-              type="checkbox"
-              checked={cacherTerminees}
-              onChange={(e) => setCacherTerminees(e.target.checked)}
-            />
-            Cacher les séances déjà terminées
-          </label>
+          <div className="mb-6 flex flex-wrap gap-x-6 gap-y-2">
+            <button
+              type="button"
+              onClick={() => setCacherTerminees((v) => !v)}
+              className="flex items-center gap-2 text-sm text-anthracite/70"
+            >
+              <span
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                  cacherTerminees ? "bg-framboise" : "bg-creme-dark"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    cacherTerminees ? "translate-x-4" : "translate-x-0.5"
+                  }`}
+                />
+              </span>
+              Cacher les séances déjà terminées
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setAfficherFavorisSeulement((v) => !v)}
+              className="flex items-center gap-2 text-sm text-anthracite/70"
+            >
+              <span
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                  afficherFavorisSeulement ? "bg-framboise" : "bg-creme-dark"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    afficherFavorisSeulement ? "translate-x-4" : "translate-x-0.5"
+                  }`}
+                />
+              </span>
+              ❤️ Mes favoris uniquement
+            </button>
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {videosAffichees.map((v) => (
