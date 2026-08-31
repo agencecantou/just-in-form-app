@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-export default function ReinitialiserMotDePassePage() {
+type StatutVerification = "verification" | "pret" | "echec";
+
+function PageInterieure() {
   const router = useRouter();
-  const [pret, setPret] = useState(false);
+  const params = useSearchParams();
+  const [statut, setStatut] = useState<StatutVerification>("verification");
   const [motDePasse, setMotDePasse] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [envoi, setEnvoi] = useState(false);
@@ -15,17 +18,38 @@ export default function ReinitialiserMotDePassePage() {
 
   useEffect(() => {
     const supabase = createClient();
-    // Le lien recu par email cree une session "recovery" cote client des
-    // l'arrivee sur la page (detectSessionInUrl de @supabase/ssr).
+    const tokenHash = params.get("token_hash");
+    const type = params.get("type");
+
+    // Format recommande par Supabase pour eviter qu'un scanner de liens
+    // (antivirus, Gmail, etc.) ne consomme le lien a usage unique avant que
+    // la personne ne clique elle-meme : la verification se fait ici, cote
+    // client, uniquement quand la page s'affiche vraiment dans un
+    // navigateur.
+    if (tokenHash && type) {
+      supabase.auth
+        .verifyOtp({
+          token_hash: tokenHash,
+          type: type as "recovery" | "invite" | "email" | "email_change" | "signup",
+        })
+        .then(({ error }) => {
+          setStatut(error ? "echec" : "pret");
+        });
+      return;
+    }
+
+    // Ancien format (lien direct Supabase avec ?code=) : la session est
+    // deja etablie automatiquement par detectSessionInUrl a ce stade.
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
-        setPret(true);
+        setStatut("pret");
       }
     });
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setPret(true);
+      if (data.session) setStatut("pret");
     });
     return () => sub.subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function valider(e: React.FormEvent) {
@@ -36,7 +60,7 @@ export default function ReinitialiserMotDePassePage() {
       return;
     }
     if (motDePasse.length < 6) {
-      setErreur("6 caracteres minimum.");
+      setErreur("6 caractères minimum.");
       return;
     }
     setEnvoi(true);
@@ -64,14 +88,24 @@ export default function ReinitialiserMotDePassePage() {
 
         {reussi ? (
           <div className="rounded-2xl bg-white border border-creme-dark p-6 text-center">
-            <p className="text-sm">Mot de passe mis a jour. Redirection...</p>
+            <p className="text-sm">Mot de passe mis à jour. Redirection...</p>
           </div>
-        ) : !pret ? (
+        ) : statut === "verification" ? (
           <div className="rounded-2xl bg-white border border-creme-dark p-6 text-center">
+            <p className="text-sm text-anthracite/60">Vérification du lien...</p>
+          </div>
+        ) : statut === "echec" ? (
+          <div className="rounded-2xl bg-white border border-creme-dark p-6 text-center space-y-3">
             <p className="text-sm text-anthracite/60">
-              Ouvre cette page depuis le lien recu par email pour definir un
-              nouveau mot de passe.
+              Ce lien n&apos;est plus valable (déjà utilisé ou expiré). Demande
+              un nouveau lien de réinitialisation.
             </p>
+            <a
+              href="/mot-de-passe-oublie"
+              className="inline-block rounded-full bg-framboise text-white px-5 py-2 text-sm font-semibold"
+            >
+              Redemander un lien
+            </a>
           </div>
         ) : (
           <form onSubmit={valider} className="rounded-2xl bg-white border border-creme-dark p-6 space-y-4">
@@ -111,5 +145,13 @@ export default function ReinitialiserMotDePassePage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ReinitialiserMotDePassePage() {
+  return (
+    <Suspense>
+      <PageInterieure />
+    </Suspense>
   );
 }
