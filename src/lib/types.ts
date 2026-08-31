@@ -21,8 +21,23 @@ export type Categorie = {
   id: string;
   nom: string;
   ordre: number;
+  image_url: string | null;
   created_at: string;
 };
+
+// Image d'une video : la sienne si elle en a une, sinon celle de la
+// premiere de ses categories qui possede une image par defaut.
+export function imageEffectiveVideo(
+  video: Pick<Video, "image_url" | "categories">,
+  imagesParCategorie: Map<string, string | null>
+): string | null {
+  if (video.image_url) return video.image_url;
+  for (const cat of video.categories ?? []) {
+    const img = imagesParCategorie.get(cat);
+    if (img) return img;
+  }
+  return null;
+}
 
 export type SeanceTerminee = {
   id: string;

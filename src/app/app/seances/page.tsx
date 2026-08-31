@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { ZONES_CORPS, type Categorie, type Video } from "@/lib/types";
+import { ZONES_CORPS, imageEffectiveVideo, type Categorie, type Video } from "@/lib/types";
 import CarteVideo from "@/components/CarteVideo";
 import LecteurVideo from "@/components/LecteurVideo";
 
@@ -119,6 +119,8 @@ export default function SeancesPage() {
   useEffect(() => {
     charger();
   }, []);
+
+  const imagesParCategorie = new Map(categories.map((c) => [c.nom, c.image_url]));
 
   const videosAffichees = videos.filter(
     (v) =>
@@ -245,6 +247,7 @@ export default function SeancesPage() {
                 terminee={terminees.has(v.id)}
                 ressenti={ressentiParVideo.get(v.id)}
                 progression={progressionParVideo.get(v.id)}
+                image={imageEffectiveVideo(v, imagesParCategorie)}
                 onClick={() => setVideoOuverte(v)}
               />
             ))}

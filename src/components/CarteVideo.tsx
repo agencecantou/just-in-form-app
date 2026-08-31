@@ -7,6 +7,7 @@ export default function CarteVideo({
   onClick,
   accent,
   progression,
+  image,
 }: {
   video: Video;
   terminee: boolean;
@@ -15,7 +16,10 @@ export default function CarteVideo({
   accent?: boolean;
   /** Pourcentage 0-100 si la video a ete commencee mais pas terminee. */
   progression?: number;
+  /** Image resolue (video ou, a defaut, image de categorie). Fallback sur video.image_url si non fournie. */
+  image?: string | null;
 }) {
+  const imageAffichee = image !== undefined ? image : video.image_url;
   return (
     <button
       onClick={onClick}
@@ -25,9 +29,9 @@ export default function CarteVideo({
           : "bg-white border-creme-dark hover:border-framboise/50"
       }`}
     >
-      {video.image_url && (
+      {imageAffichee && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={video.image_url} alt="" className="w-full h-32 object-cover" />
+        <img src={imageAffichee} alt="" className="w-full h-32 object-cover" />
       )}
       {progression !== undefined && progression > 0 && (
         <div className="h-1 bg-creme-dark">

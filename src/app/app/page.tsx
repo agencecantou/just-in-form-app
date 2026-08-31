@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import type { Programme, Video } from "@/lib/types";
+import { imageEffectiveVideo, type Categorie, type Programme, type Video } from "@/lib/types";
 import CarteVideo from "@/components/CarteVideo";
 import LecteurVideo from "@/components/LecteurVideo";
 
@@ -73,6 +73,7 @@ type ProgrammeEnCours = {
 export default function AppHome() {
   const [prenom, setPrenom] = useState("");
   const [videos, setVideos] = useState<Video[]>([]);
+  const [categories, setCategories] = useState<Categorie[]>([]);
   const [chargement, setChargement] = useState(true);
   const [videoOuverte, setVideoOuverte] = useState<Video | null>(null);
   const [terminees, setTerminees] = useState<Set<string>>(new Set());
@@ -100,6 +101,7 @@ export default function AppHome() {
       { data: programmeLancementData },
       { data: progressionData },
       { data: programmeVideosData },
+      { data: categoriesData },
     ] = await Promise.all([
       supabase.from("videos").select("*").eq("statut", "publie").order("created_at", { ascending: false }),
       user
@@ -118,10 +120,12 @@ export default function AppHome() {
             .order("updated_at", { ascending: false })
         : Promise.resolve({ data: [] as { video_id: string; position_secondes: number; videos: Video | null }[] }),
       supabase.from("programme_videos").select("programme_id, video_id, programmes(id, titre, statut)"),
+      supabase.from("categories").select("*"),
     ]);
 
     const toutesVideos = (videosData as Video[]) ?? [];
     setVideos(toutesVideos);
+    setCategories((categoriesData as Categorie[]) ?? []);
     setPrenom(profile?.prenom ?? "");
 
     type SeanceLigne = { video_id: string; termine_le: string; videos: { niveau: string; duree_min: number } | null };
@@ -183,6 +187,7 @@ export default function AppHome() {
     charger();
   }, []);
 
+  const imagesParCategorie = new Map(categories.map((c) => [c.nom, c.image_url]));
   const videosVedette = videos.filter((v) => v.est_vedette);
   const suggestionNiveau = calculerSuggestionNiveau(videos, niveauxSeances, terminees);
   const serie = calculerSerie(datesTerminees);
@@ -306,6 +311,7 @@ export default function AppHome() {
                       video={v}
                       terminee={terminees.has(v.id)}
                       onClick={() => setVideoOuverte(v)}
+                      image={imageEffectiveVideo(v, imagesParCategorie)}
                       accent
                     />
                   ))}
@@ -349,6 +355,7 @@ export default function AppHome() {
                   video={v}
                   terminee={terminees.has(v.id)}
                   onClick={() => setVideoOuverte(v)}
+                  image={imageEffectiveVideo(v, imagesParCategorie)}
                 />
               ))}
             </div>

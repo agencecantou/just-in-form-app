@@ -187,6 +187,7 @@ function SectionCategories() {
   const [nouveau, setNouveau] = useState("");
   const [erreur, setErreur] = useState<string | null>(null);
   const [renommage, setRenommage] = useState<{ id: string; nom: string } | null>(null);
+  const [uploadEnCoursId, setUploadEnCoursId] = useState<string | null>(null);
 
   async function charger() {
     setChargement(true);
@@ -237,12 +238,37 @@ function SectionCategories() {
     charger();
   }
 
+  async function uploaderImageCategorie(id: string, fichier: File) {
+    setUploadEnCoursId(id);
+    setErreur(null);
+    const supabase = createClient();
+    const chemin = `categories/${Date.now()}-${fichier.name.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`;
+    const { error } = await supabase.storage.from("images").upload(chemin, fichier);
+    if (error) {
+      setErreur(error.message);
+      setUploadEnCoursId(null);
+      return;
+    }
+    const { data } = supabase.storage.from("images").getPublicUrl(chemin);
+    await supabase.from("categories").update({ image_url: data.publicUrl }).eq("id", id);
+    setUploadEnCoursId(null);
+    charger();
+  }
+
+  async function supprimerImageCategorie(id: string) {
+    const supabase = createClient();
+    await supabase.from("categories").update({ image_url: null }).eq("id", id);
+    charger();
+  }
+
   return (
     <main className="flex-1 px-6 py-8 max-w-2xl">
       <h1 className="text-2xl font-semibold mb-1">Categories</h1>
       <p className="text-anthracite/60 mb-6">
         Gere la liste des categories utilisees pour classer les videos, sans
-        avoir besoin de repasser par le developpement.
+        avoir besoin de repasser par le developpement. Chaque categorie peut
+        avoir une image par defaut : si une video n&apos;a pas sa propre
+        image, celle de sa premiere categorie avec une image sera utilisee.
       </p>
 
       <div className="rounded-2xl bg-white border border-creme-dark p-5 mb-6 flex gap-3">
@@ -271,19 +297,31 @@ function SectionCategories() {
           {categories.map((c) => (
             <div
               key={c.id}
-              className="rounded-xl bg-white border border-creme-dark p-3 flex items-center justify-between gap-3"
+              className="rounded-xl bg-white border border-creme-dark p-3 flex items-center justify-between gap-3 flex-wrap"
             >
-              {renommage?.id === c.id ? (
-                <input
-                  autoFocus
-                  value={renommage.nom}
-                  onChange={(e) => setRenommage({ id: c.id, nom: e.target.value })}
-                  onKeyDown={(e) => e.key === "Enter" && renommer()}
-                  className="flex-1 rounded-lg border border-creme-dark px-2 py-1 text-sm"
-                />
-              ) : (
-                <p className="text-sm font-medium">{c.nom}</p>
-              )}
+              <div className="flex items-center gap-3 min-w-0">
+                {c.image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={c.image_url}
+                    alt=""
+                    className="w-10 h-10 rounded-lg object-cover border border-creme-dark shrink-0"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-lg bg-creme border border-creme-dark shrink-0" />
+                )}
+                {renommage?.id === c.id ? (
+                  <input
+                    autoFocus
+                    value={renommage.nom}
+                    onChange={(e) => setRenommage({ id: c.id, nom: e.target.value })}
+                    onKeyDown={(e) => e.key === "Enter" && renommer()}
+                    className="flex-1 rounded-lg border border-creme-dark px-2 py-1 text-sm"
+                  />
+                ) : (
+                  <p className="text-sm font-medium truncate">{c.nom}</p>
+                )}
+              </div>
               <div className="flex items-center gap-3 shrink-0">
                 {renommage?.id === c.id ? (
                   <>
@@ -299,6 +337,27 @@ function SectionCategories() {
                   </>
                 ) : (
                   <>
+                    <label className="text-xs underline text-anthracite/60 cursor-pointer">
+                      {uploadEnCoursId === c.id ? "Envoi..." : c.image_url ? "Changer l'image" : "Ajouter une image"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploadEnCoursId === c.id}
+                        onChange={(e) => {
+                          const fichier = e.target.files?.[0];
+                          if (fichier) uploaderImageCategorie(c.id, fichier);
+                        }}
+                      />
+                    </label>
+                    {c.image_url && (
+                      <button
+                        onClick={() => supprimerImageCategorie(c.id)}
+                        className="text-xs underline text-anthracite/40"
+                      >
+                        Retirer l&apos;image
+                      </button>
+                    )}
                     <button
                       onClick={() => setRenommage({ id: c.id, nom: c.nom })}
                       className="text-xs underline text-anthracite/60"
