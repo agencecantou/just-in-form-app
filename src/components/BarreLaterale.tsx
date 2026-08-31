@@ -73,18 +73,31 @@ export default function BarreLaterale({ children }: { children: React.ReactNode 
     router.refresh();
   }
 
-  const liens = estCoach ? [...LIENS_BASE, { href: "/admin", label: "Espace coach", icone: "🛠️" }] : LIENS_BASE;
+  const liens = LIENS_BASE;
 
   return (
     <div className="flex-1 flex flex-col sm:flex-row bg-creme min-h-screen">
       {/* Sur mobile : barre horizontale scrollable. Sur desktop : sidebar verticale. */}
       <aside className="flex flex-row sm:flex-col gap-1 sm:w-60 overflow-x-auto border-b sm:border-b-0 sm:border-r border-creme-dark bg-white px-3 sm:px-4 py-3 sm:py-6 shrink-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.png" alt="Just In Form" className="hidden sm:block h-10 w-auto mb-2 px-2" />
+        <img
+          src="/logo.png"
+          alt="Just In Form"
+          className="hidden sm:block self-start h-10 w-10 object-contain mb-2 px-2"
+        />
         {prenom && (
           <p className="hidden sm:block mb-4 px-2 text-xs text-anthracite/50">
             Salut {prenom}
           </p>
+        )}
+        {estCoach && (
+          <Link
+            href="/admin"
+            className="shrink-0 whitespace-nowrap mb-2 rounded-xl px-3 py-2.5 text-sm flex items-center gap-2 bg-anthracite text-creme font-medium hover:opacity-90"
+          >
+            <span>🛠️</span>
+            Espace coach
+          </Link>
         )}
         {liens.map((lien) => {
           const actif =

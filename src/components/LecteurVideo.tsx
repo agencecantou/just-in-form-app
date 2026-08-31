@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Player from "@vimeo/player";
 import { createClient } from "@/lib/supabase/client";
 import { urlEmbedVimeo } from "@/lib/vimeo";
 import { RESSENTIS, type Video } from "@/lib/types";
@@ -41,15 +42,19 @@ export default function LecteurVideo({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const conteneurRef = useRef<HTMLDivElement>(null);
   const barreRef = useRef<HTMLDivElement>(null);
+  // Instance du lecteur Vimeo officiel (@vimeo/player) : gere elle-meme tout
+  // le protocole postMessage (handshake, requetes/reponses), plus fiable
+  // qu'une reimplementation maison de ce protocole.
+  const playerRef = useRef<Player | null>(null);
   const derniereSauvegardeRef = useRef(0);
   const positionRef = useRef(0);
   const positionDepartRef = useRef(0);
   const userIdRef = useRef<string | null>(null);
   const dejaMarqueeRef = useRef(false);
   const glissementRef = useRef(false);
-  // La position sauvegardee peut arriver avant ou apres l'evenement "ready"
-  // du lecteur Vimeo (selon la vitesse du reseau) : on ne tente le seek que
-  // quand les deux sont prets, et une seule fois.
+  // La position sauvegardee peut arriver avant ou apres que le lecteur soit
+  // pret (selon la vitesse du reseau) : on ne tente le seek que quand les
+  // deux sont prets, et une seule fois.
   const lecteurPretRef = useRef(false);
   const positionChargeeRef = useRef(false);
   const repriseEnvoyeeRef = useRef(false);
@@ -58,11 +63,49 @@ export default function LecteurVideo({
     if (!lecteurPretRef.current || !positionChargeeRef.current || repriseEnvoyeeRef.current) return;
     repriseEnvoyeeRef.current = true;
     if (positionDepartRef.current > SEUIL_REPRISE_SECONDES) {
-      envoyer({ method: "setCurrentTime", value: positionDepartRef.current });
+      playerRef.current?.setCurrentTime(positionDepartRef.current).catch(() => {});
       setPositionAffichee(positionDepartRef.current);
       positionRef.current = positionDepartRef.current;
     }
   }
+
+  // Cree le lecteur Vimeo et branche ses evenements (pret, avancement,
+  // lecture/pause, fin).
+  useEffect(() => {
+    if (!iframeRef.current) return;
+    const player = new Player(iframeRef.current);
+    playerRef.current = player;
+
+    player.on("play", () => setEnLecture(true));
+    player.on("pause", () => setEnLecture(false));
+    player.on("timeupdate", (data: { seconds: number }) => {
+      positionRef.current = data.seconds;
+      if (!glissementRef.current) setPositionAffichee(data.seconds);
+      const maintenant = Date.now();
+      if (maintenant - derniereSauvegardeRef.current > INTERVALLE_SAUVEGARDE_MS) {
+        derniereSauvegardeRef.current = maintenant;
+        sauvegarderPosition(data.seconds);
+      }
+    });
+    player.on("ended", () => {
+      marquerCommeTerminee();
+    });
+
+    player.getDuration().then((d) => {
+      if (d > 0) setDureeSecondes(d);
+    });
+
+    player.ready().then(() => {
+      lecteurPretRef.current = true;
+      tenterReprise();
+    });
+
+    return () => {
+      playerRef.current = null;
+      player.destroy().catch(() => {});
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [video.id]);
 
   // Recupere l'utilisateur, incremente les vues, charge une eventuelle
   // reprise et l'etat favori pour cette video.
@@ -101,59 +144,7 @@ export default function LecteurVideo({
       tenterReprise();
     }
     init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [video.id]);
-
-  // Ecoute les evenements du lecteur Vimeo (protocole postMessage officiel,
-  // pas besoin de librairie externe) : pret, avancement, lecture/pause, fin.
-  useEffect(() => {
-    function onMessage(e: MessageEvent) {
-      if (e.origin !== "https://player.vimeo.com") return;
-      if (!iframeRef.current || e.source !== iframeRef.current.contentWindow) return;
-
-      let data: { event?: string; method?: string; value?: number; data?: { seconds?: number } };
-      try {
-        data = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
-      } catch {
-        return;
-      }
-
-      if (data.event === "ready") {
-        envoyer({ method: "addEventListener", value: "timeupdate" });
-        envoyer({ method: "addEventListener", value: "ended" });
-        envoyer({ method: "addEventListener", value: "play" });
-        envoyer({ method: "addEventListener", value: "pause" });
-        envoyer({ method: "getDuration" });
-        lecteurPretRef.current = true;
-        tenterReprise();
-      }
-
-      if (data.method === "getDuration" && typeof data.value === "number" && data.value > 0) {
-        setDureeSecondes(data.value);
-      }
-
-      if (data.event === "timeupdate" && data.data?.seconds !== undefined) {
-        positionRef.current = data.data.seconds;
-        if (!glissementRef.current) setPositionAffichee(data.data.seconds);
-        const maintenant = Date.now();
-        if (maintenant - derniereSauvegardeRef.current > INTERVALLE_SAUVEGARDE_MS) {
-          derniereSauvegardeRef.current = maintenant;
-          sauvegarderPosition(data.data.seconds);
-        }
-      }
-
-      if (data.event === "play") setEnLecture(true);
-      if (data.event === "pause") setEnLecture(false);
-
-      if (data.event === "ended") {
-        marquerCommeTerminee();
-      }
-    }
-
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Suit le plein ecran reel du navigateur (bouton custom, touche Echap, etc.)
   useEffect(() => {
@@ -163,13 +154,6 @@ export default function LecteurVideo({
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
-
-  function envoyer(message: Record<string, unknown>) {
-    iframeRef.current?.contentWindow?.postMessage(
-      JSON.stringify(message),
-      "https://player.vimeo.com"
-    );
-  }
 
   async function sauvegarderPosition(secondes: number) {
     if (!userIdRef.current) return;
@@ -235,7 +219,11 @@ export default function LecteurVideo({
   }
 
   function togglerLecture() {
-    envoyer({ method: enLecture ? "pause" : "play" });
+    if (enLecture) {
+      playerRef.current?.pause().catch(() => {});
+    } else {
+      playerRef.current?.play().catch(() => {});
+    }
   }
 
   async function togglerFavori() {
@@ -286,7 +274,7 @@ export default function LecteurVideo({
     glissementRef.current = false;
     const nouvelle = positionDepuisPointeur(e.clientX);
     positionRef.current = nouvelle;
-    envoyer({ method: "setCurrentTime", value: nouvelle });
+    playerRef.current?.setCurrentTime(nouvelle).catch(() => {});
     sauvegarderPosition(nouvelle);
   }
 
@@ -303,7 +291,7 @@ export default function LecteurVideo({
         <div ref={conteneurRef} className="relative aspect-video bg-anthracite">
           <iframe
             ref={iframeRef}
-            src={`${urlEmbedVimeo(video.vimeo_id)}?api=1&player_id=jif-player&controls=0&title=0&byline=0&portrait=0`}
+            src={`${urlEmbedVimeo(video.vimeo_id)}?controls=0&title=0&byline=0&portrait=0`}
             className="w-full h-full pointer-events-none"
             allow="autoplay; picture-in-picture"
           />
