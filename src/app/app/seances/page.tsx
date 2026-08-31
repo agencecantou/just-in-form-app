@@ -2,24 +2,33 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { Categorie, Video } from "@/lib/types";
+import { ZONES_CORPS, type Categorie, type Video } from "@/lib/types";
 import CarteVideo from "@/components/CarteVideo";
 import LecteurVideo from "@/components/LecteurVideo";
 
-type FiltreDuree = "toutes" | "court" | "moyen" | "long";
+type FiltreDuree = "toutes" | "court" | "moyen" | "long" | "tres-long";
+type FiltreMateriel = "tous" | "sans" | "avec";
 
 const FILTRES_DUREE: { valeur: FiltreDuree; label: string }[] = [
   { valeur: "toutes", label: "Toutes durées" },
   { valeur: "court", label: "< 15 min" },
   { valeur: "moyen", label: "15 à 30 min" },
-  { valeur: "long", label: "> 30 min" },
+  { valeur: "long", label: "30 à 45 min" },
+  { valeur: "tres-long", label: "> 45 min" },
 ];
 
 function correspondDuree(video: Video, filtre: FiltreDuree) {
   if (filtre === "toutes") return true;
   if (filtre === "court") return video.duree_min < 15;
   if (filtre === "moyen") return video.duree_min >= 15 && video.duree_min <= 30;
-  return video.duree_min > 30;
+  if (filtre === "long") return video.duree_min > 30 && video.duree_min <= 45;
+  return video.duree_min > 45;
+}
+
+function correspondMateriel(video: Video, filtre: FiltreMateriel) {
+  if (filtre === "tous") return true;
+  if (filtre === "sans") return !video.avec_materiel;
+  return video.avec_materiel;
 }
 
 // Regroupe les ressentis par video et garde la valeur la plus frequente.
@@ -59,6 +68,9 @@ export default function SeancesPage() {
   const [progressionParVideo, setProgressionParVideo] = useState<Map<string, number>>(new Map());
   const [filtreCategorie, setFiltreCategorie] = useState<string | null>(null);
   const [filtreDuree, setFiltreDuree] = useState<FiltreDuree>("toutes");
+  const [filtreMateriel, setFiltreMateriel] = useState<FiltreMateriel>("tous");
+  const [filtreZone, setFiltreZone] = useState<string | null>(null);
+  const [cacherTerminees, setCacherTerminees] = useState(false);
 
   async function charger() {
     setChargement(true);
@@ -111,7 +123,10 @@ export default function SeancesPage() {
   const videosAffichees = videos.filter(
     (v) =>
       (!filtreCategorie || v.categories?.includes(filtreCategorie)) &&
-      correspondDuree(v, filtreDuree)
+      (!filtreZone || v.zones_corps?.includes(filtreZone)) &&
+      correspondDuree(v, filtreDuree) &&
+      correspondMateriel(v, filtreMateriel) &&
+      (!cacherTerminees || !terminees.has(v.id))
   );
 
   return (
@@ -149,7 +164,7 @@ export default function SeancesPage() {
             ))}
           </div>
 
-          <div className="mb-6 flex flex-wrap gap-2">
+          <div className="mb-3 flex flex-wrap gap-2">
             {FILTRES_DUREE.map((f) => (
               <button
                 key={f.valeur}
@@ -164,6 +179,63 @@ export default function SeancesPage() {
               </button>
             ))}
           </div>
+
+          <div className="mb-3 flex flex-wrap gap-2">
+            {(
+              [
+                { valeur: "tous", label: "Matériel : tous" },
+                { valeur: "sans", label: "Sans matériel" },
+                { valeur: "avec", label: "Avec matériel" },
+              ] as const
+            ).map((f) => (
+              <button
+                key={f.valeur}
+                onClick={() => setFiltreMateriel(f.valeur)}
+                className={`rounded-full px-3 py-1.5 text-xs border ${
+                  filtreMateriel === f.valeur
+                    ? "bg-orange text-anthracite border-orange font-medium"
+                    : "bg-white text-anthracite/60 border-creme-dark"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="mb-3 flex flex-wrap gap-2">
+            <button
+              onClick={() => setFiltreZone(null)}
+              className={`rounded-full px-3 py-1.5 text-xs border ${
+                filtreZone === null
+                  ? "bg-anthracite text-white border-anthracite"
+                  : "bg-white text-anthracite/60 border-creme-dark"
+              }`}
+            >
+              Toutes zones
+            </button>
+            {ZONES_CORPS.map((z) => (
+              <button
+                key={z}
+                onClick={() => setFiltreZone(z)}
+                className={`rounded-full px-3 py-1.5 text-xs border ${
+                  filtreZone === z
+                    ? "bg-anthracite text-white border-anthracite"
+                    : "bg-white text-anthracite/60 border-creme-dark"
+                }`}
+              >
+                {z}
+              </button>
+            ))}
+          </div>
+
+          <label className="mb-6 flex items-center gap-2 text-sm text-anthracite/70">
+            <input
+              type="checkbox"
+              checked={cacherTerminees}
+              onChange={(e) => setCacherTerminees(e.target.checked)}
+            />
+            Cacher les séances déjà terminées
+          </label>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {videosAffichees.map((v) => (

@@ -10,8 +10,12 @@ export type Video = {
   statut: "publie" | "brouillon";
   est_vedette: boolean;
   vues: number;
+  avec_materiel: boolean;
+  zones_corps: string[];
   created_at: string;
 };
+
+export const ZONES_CORPS = ["Abdos", "Dos", "Haut du corps", "Bas du corps", "Full body"] as const;
 
 export type Categorie = {
   id: string;

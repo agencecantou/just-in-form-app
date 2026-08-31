@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { extraireVimeoId } from "@/lib/vimeo";
 import {
   NIVEAUX,
+  ZONES_CORPS,
   type Avis,
   type Categorie,
   type Programme,
@@ -388,6 +389,8 @@ function SectionVideos() {
   const [banqueImages, setBanqueImages] = useState<string[]>([]);
   const [uploadEnCours, setUploadEnCours] = useState(false);
   const [categoriesSelectionnees, setCategoriesSelectionnees] = useState<string[]>([]);
+  const [zonesSelectionnees, setZonesSelectionnees] = useState<string[]>([]);
+  const [avecMateriel, setAvecMateriel] = useState(false);
   const [dureeMin, setDureeMin] = useState(20);
   const [niveau, setNiveau] = useState<string>(NIVEAUX[0]);
   const [lienVimeo, setLienVimeo] = useState("");
@@ -448,6 +451,12 @@ function SectionVideos() {
     );
   }
 
+  function toggleZone(zone: string) {
+    setZonesSelectionnees((prev) =>
+      prev.includes(zone) ? prev.filter((z) => z !== zone) : [...prev, zone]
+    );
+  }
+
   function reinitialiserFormulaire() {
     setTitre("");
     setDescription("");
@@ -455,6 +464,8 @@ function SectionVideos() {
     setLienVimeo("");
     setDureeMin(20);
     setCategoriesSelectionnees([]);
+    setZonesSelectionnees([]);
+    setAvecMateriel(false);
     setEstVedette(false);
     setVideoEnEdition(null);
   }
@@ -465,6 +476,8 @@ function SectionVideos() {
     setDescription(video.description ?? "");
     setImageUrl(video.image_url ?? null);
     setCategoriesSelectionnees(video.categories ?? []);
+    setZonesSelectionnees(video.zones_corps ?? []);
+    setAvecMateriel(video.avec_materiel ?? false);
     setDureeMin(video.duree_min);
     setNiveau(video.niveau);
     setLienVimeo(`https://vimeo.com/${video.vimeo_id}`);
@@ -501,6 +514,8 @@ function SectionVideos() {
       description: description.trim() || null,
       image_url: imageUrl,
       categories: categoriesSelectionnees,
+      zones_corps: zonesSelectionnees,
+      avec_materiel: avecMateriel,
       duree_min: dureeMin,
       niveau,
       vimeo_id: vimeoId,
@@ -584,6 +599,37 @@ function SectionVideos() {
             ))}
           </div>
         </div>
+
+        <div>
+          <label className="text-sm font-medium">
+            Zones du corps <span className="text-anthracite/40 font-normal">(optionnel, plusieurs possibles)</span>
+          </label>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {ZONES_CORPS.map((z) => (
+              <button
+                type="button"
+                key={z}
+                onClick={() => toggleZone(z)}
+                className={`rounded-full px-3 py-1.5 text-sm border ${
+                  zonesSelectionnees.includes(z)
+                    ? "bg-framboise text-white border-framboise"
+                    : "bg-white text-anthracite/70 border-creme-dark"
+                }`}
+              >
+                {z}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={avecMateriel}
+            onChange={(e) => setAvecMateriel(e.target.checked)}
+          />
+          Nécessite du matériel
+        </label>
 
         <div>
           <label className="text-sm font-medium">
@@ -777,6 +823,7 @@ function SectionVideos() {
                 </p>
                 <p className="text-sm text-anthracite/50">
                   {v.categories?.join(", ")} &middot; {v.duree_min} min &middot; {v.niveau}
+                  {v.avec_materiel && " · Materiel"}
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap justify-end">

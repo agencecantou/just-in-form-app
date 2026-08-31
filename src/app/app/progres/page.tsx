@@ -48,10 +48,19 @@ function calculerMeilleureSerie(dates: string[]): number {
   return meilleure;
 }
 
+function formaterDuree(minutes: number) {
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, "0")}`;
+}
+
 export default function ProgresPage() {
   const [chargement, setChargement] = useState(true);
   const [minutesParJour, setMinutesParJour] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
   const [badges, setBadges] = useState<Badge[]>([]);
+  const [totalSeances, setTotalSeances] = useState(0);
+  const [totalMinutes, setTotalMinutes] = useState(0);
 
   useEffect(() => {
     async function charger() {
@@ -92,6 +101,9 @@ export default function ProgresPage() {
 
       const meilleureSerie = calculerMeilleureSerie(dates);
       const totalSeances = seances.length;
+      const totalMinutesEntrainement = seances.reduce((total, s) => total + (s.videos?.duree_min ?? 0), 0);
+      setTotalSeances(totalSeances);
+      setTotalMinutes(totalMinutesEntrainement);
       const totalPiloxing = seances.filter((s) => s.videos?.categories?.includes("Piloxing")).length;
       const leveTot = seances.some((s) => new Date(s.termine_le).getHours() < 8);
 
@@ -132,6 +144,17 @@ export default function ProgresPage() {
         <p className="text-sm text-anthracite/50">Chargement...</p>
       ) : (
         <>
+          <div className="grid grid-cols-2 gap-4 mb-8">
+            <div className="rounded-2xl bg-white border border-creme-dark p-4">
+              <p className="text-2xl font-semibold text-framboise">{totalSeances}</p>
+              <p className="text-xs text-anthracite/50 mt-1">vidéos réalisées</p>
+            </div>
+            <div className="rounded-2xl bg-white border border-creme-dark p-4">
+              <p className="text-2xl font-semibold text-framboise">{formaterDuree(totalMinutes)}</p>
+              <p className="text-xs text-anthracite/50 mt-1">d&apos;entraînement au total</p>
+            </div>
+          </div>
+
           <div className="rounded-2xl bg-white border border-creme-dark p-6 mb-8">
             <p className="font-semibold mb-6">Ta semaine d&apos;entraînement</p>
             <div className="grid grid-cols-7 gap-3 items-end h-40">

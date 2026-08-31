@@ -13,12 +13,15 @@ const OBJECTIFS = ["Perdre du poids", "Se muscler", "Gagner en souplesse", "Se s
 
 const ONGLETS = ["Mon profil", "Mon abonnement", "Préférences"] as const;
 
+const FREQUENCES = ["1 séance/semaine", "2 séances/semaine", "3+ séances/semaine"];
+
 type Preferences = {
   rappels: boolean;
   serie: boolean;
   nouveautes: boolean;
   newsletter: boolean;
   objectifs: string[];
+  frequence: string | null;
 };
 
 const PREFERENCES_DEFAUT: Preferences = {
@@ -27,6 +30,7 @@ const PREFERENCES_DEFAUT: Preferences = {
   nouveautes: true,
   newsletter: false,
   objectifs: ["Se sentir mieux"],
+  frequence: null,
 };
 
 export default function MonCompte() {
@@ -142,10 +146,11 @@ export default function MonCompte() {
               email={email}
               photoUrl={photoUrl}
               objectifs={preferences.objectifs}
-              onEnregistre={(p, photo, objectifs) => {
+              frequence={preferences.frequence}
+              onEnregistre={(p, photo, objectifs, frequence) => {
                 setPrenom(p);
                 setPhotoUrl(photo);
-                setPreferences((prev) => ({ ...prev, objectifs }));
+                setPreferences((prev) => ({ ...prev, objectifs, frequence }));
               }}
             />
           )}
@@ -165,6 +170,7 @@ function OngletProfil({
   email,
   photoUrl,
   objectifs,
+  frequence,
   onEnregistre,
 }: {
   userId: string;
@@ -172,10 +178,12 @@ function OngletProfil({
   email: string;
   photoUrl: string | null;
   objectifs: string[];
-  onEnregistre: (prenom: string, photoUrl: string | null, objectifs: string[]) => void;
+  frequence: string | null;
+  onEnregistre: (prenom: string, photoUrl: string | null, objectifs: string[], frequence: string | null) => void;
 }) {
   const [prenomSaisi, setPrenomSaisi] = useState(prenom);
   const [objectifsSaisis, setObjectifsSaisis] = useState<string[]>(objectifs);
+  const [frequenceSaisie, setFrequenceSaisie] = useState<string | null>(frequence);
   const [photo, setPhoto] = useState<string | null>(photoUrl);
   const [enregistrement, setEnregistrement] = useState(false);
   const [uploadEnCours, setUploadEnCours] = useState(false);
@@ -184,6 +192,7 @@ function OngletProfil({
 
   useEffect(() => setPrenomSaisi(prenom), [prenom]);
   useEffect(() => setObjectifsSaisis(objectifs), [objectifs]);
+  useEffect(() => setFrequenceSaisie(frequence), [frequence]);
   useEffect(() => setPhoto(photoUrl), [photoUrl]);
 
   function toggleObjectif(o: string) {
@@ -218,9 +227,11 @@ function OngletProfil({
       const { data: profil } = await supabase.from("profiles").select("preferences").eq("id", userId).maybeSingle();
       await supabase
         .from("profiles")
-        .update({ preferences: { ...(profil?.preferences ?? {}), objectifs: objectifsSaisis } })
+        .update({
+          preferences: { ...(profil?.preferences ?? {}), objectifs: objectifsSaisis, frequence: frequenceSaisie },
+        })
         .eq("id", userId);
-      onEnregistre(prenomSaisi, photo, objectifsSaisis);
+      onEnregistre(prenomSaisi, photo, objectifsSaisis, frequenceSaisie);
       setMessage("Profil enregistré.");
     } else {
       setMessage("Erreur pendant l'enregistrement, réessaie.");
@@ -303,6 +314,28 @@ function OngletProfil({
               }`}
             >
               {o}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-2xl bg-white border border-creme-dark p-5">
+        <p className="font-medium text-sm mb-1">Fréquence souhaitée</p>
+        <p className="text-xs text-anthracite/50 mb-3">
+          Le rythme que tu vises, pour t&apos;aider à rester régulière.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {FREQUENCES.map((f) => (
+            <button
+              key={f}
+              onClick={() => setFrequenceSaisie(f)}
+              className={`rounded-full px-3 py-1.5 text-sm border ${
+                frequenceSaisie === f
+                  ? "bg-framboise text-white border-framboise"
+                  : "bg-white text-anthracite/70 border-creme-dark"
+              }`}
+            >
+              {f}
             </button>
           ))}
         </div>
