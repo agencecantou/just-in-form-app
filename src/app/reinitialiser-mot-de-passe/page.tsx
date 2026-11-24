@@ -82,54 +82,54 @@ function PageInterieure() {
     <div className="flex-1 flex items-center justify-center px-6 py-16">
       <div className="w-full max-w-sm">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.png" alt="Just In Form" className="h-16 w-auto mx-auto mb-1" />
-        <p className="text-center text-anthracite/60 mb-8">
+        <img src="/logo.png" alt="Just In Form" className="h-16 w-auto mx-auto mb-3" />
+        <p className="text-center text-gris mb-8">
           Nouveau mot de passe
         </p>
 
         {reussi ? (
-          <div className="rounded-2xl bg-white border border-creme-dark p-6 text-center">
+          <div className="verre rounded-2xl p-6 text-center">
             <p className="text-sm">Mot de passe mis à jour. Redirection...</p>
           </div>
         ) : statut === "verification" ? (
-          <div className="rounded-2xl bg-white border border-creme-dark p-6 text-center">
-            <p className="text-sm text-anthracite/60">Vérification du lien...</p>
+          <div className="verre rounded-2xl p-6 text-center">
+            <p className="text-sm text-gris">Vérification du lien...</p>
           </div>
         ) : statut === "echec" ? (
-          <div className="rounded-2xl bg-white border border-creme-dark p-6 text-center space-y-3">
-            <p className="text-sm text-anthracite/60">
+          <div className="verre rounded-2xl p-6 text-center space-y-3">
+            <p className="text-sm text-gris">
               Ce lien n&apos;est plus valable (déjà utilisé ou expiré). Demande
               un nouveau lien de réinitialisation.
             </p>
             <a
               href="/mot-de-passe-oublie"
-              className="inline-block rounded-full bg-framboise text-white px-5 py-2 text-sm font-semibold"
+              className="btn btn-principal"
             >
               Redemander un lien
             </a>
           </div>
         ) : (
-          <form onSubmit={valider} className="rounded-2xl bg-white border border-creme-dark p-6 space-y-4">
+          <form onSubmit={valider} className="verre rounded-2xl p-6 space-y-4">
             <div>
-              <label className="text-sm font-medium">Nouveau mot de passe</label>
+              <label className="text-sm font-semibold">Nouveau mot de passe</label>
               <input
                 type="password"
                 required
                 minLength={6}
                 value={motDePasse}
                 onChange={(e) => setMotDePasse(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-creme-dark px-3 py-2 text-sm"
+                className="champ mt-1.5"
               />
             </div>
             <div>
-              <label className="text-sm font-medium">Confirmation</label>
+              <label className="text-sm font-semibold">Confirmation</label>
               <input
                 type="password"
                 required
                 minLength={6}
                 value={confirmation}
                 onChange={(e) => setConfirmation(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-creme-dark px-3 py-2 text-sm"
+                className="champ mt-1.5"
               />
             </div>
 
@@ -138,7 +138,7 @@ function PageInterieure() {
             <button
               type="submit"
               disabled={envoi}
-              className="w-full rounded-full bg-framboise text-white px-5 py-2.5 text-sm font-semibold disabled:opacity-50"
+              className="btn btn-principal w-full"
             >
               Valider le nouveau mot de passe
             </button>

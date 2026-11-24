@@ -1,36 +1,271 @@
 @import "tailwindcss";
 
-:root {
-  --background: #FBF3E9;
-  --foreground: #201418;
+/*
+  Just In Form : charte (palette Coolors de Justine)
+  framboise #92114f, jaune #fab200, gris #878787, creme #f6f0ea, rose #f9c8df
+  + vert feuille et bleu eau pour la mecanique de la plante.
 
-  /* Just In Form : identite de marque */
-  --color-framboise: #C2255C;
-  --color-framboise-dark: #9A1C48;
-  --color-framboise-light: #F6D9E3;
-  --color-orange: #F2762E;
-  --color-orange-light: #FDE4D2;
-  --color-creme: #FBF3E9;
-  --color-creme-dark: #F1E4D3;
-  --color-anthracite: #221A1D;
+  Les anciens noms (orange, anthracite, creme-dark, framboise-light...) sont
+  gardes et pointent vers la nouvelle palette pour que tout le code existant
+  suive sans reecriture.
+*/
+:root {
+  --background: #f6f0ea;
+  --foreground: #2b1d24;
 }
 
 @theme inline {
+  --font-sans: "Montserrat", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-framboise: var(--color-framboise);
-  --color-framboise-dark: var(--color-framboise-dark);
-  --color-framboise-light: var(--color-framboise-light);
-  --color-orange: var(--color-orange);
-  --color-orange-light: var(--color-orange-light);
-  --color-creme: var(--color-creme);
-  --color-creme-dark: var(--color-creme-dark);
-  --color-anthracite: var(--color-anthracite);
+
+  --color-framboise: #92114f;
+  --color-framboise-dark: #6e0c3b;
+  --color-framboise-light: #fbe4ee;
+  --color-rose: #f9c8df;
+  --color-jaune: #fab200;
+  --color-jaune-light: #fdf0c7;
+  --color-orange: #fab200;
+  --color-orange-light: #fdf0c7;
+  --color-creme: #f6f0ea;
+  --color-creme-dark: #eadfd6;
+  --color-anthracite: #2b1d24;
+  --color-encre: #2b1d24;
+  --color-gris: #6d5a63;
+  --color-feuille: #3f8f63;
+  --color-feuille-dark: #2f6b4f;
+  --color-menthe: #dff1e9;
+  --color-eau: #5bb8d4;
+  --color-eau-dark: #1d6f86;
+}
+
+html {
+  background: var(--background);
 }
 
 body {
-  background: var(--background);
   color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial,
-    Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  background:
+    radial-gradient(60rem 40rem at 100% -10%, rgba(250, 178, 0, 0.13), transparent 60%),
+    radial-gradient(50rem 40rem at -10% 110%, rgba(63, 143, 99, 0.12), transparent 60%),
+    linear-gradient(150deg, #fbe4ee 0%, #f6f0ea 45%, #e6f2ec 100%);
+  background-attachment: fixed;
+}
+
+/* Panneau "verre" : la base des cartes de l'appli */
+.verre {
+  background: rgba(255, 255, 255, 0.66);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 30px -12px rgba(146, 17, 79, 0.16);
+}
+
+/* Titres : Montserrat tres grasse, serree */
+.titre-ecran {
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+}
+
+.chiffre {
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.etiquette {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.filet {
+  border-top: 1px solid rgba(43, 29, 36, 0.08);
+}
+
+/* Boutons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0 1.15rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s;
+}
+.btn:active {
+  transform: scale(0.98);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.btn-principal {
+  background: #92114f;
+  color: #fff;
+  box-shadow: 0 10px 22px -10px rgba(146, 17, 79, 0.6);
+}
+.btn-principal:hover {
+  background: #6e0c3b;
+}
+.btn-sombre {
+  background: #2b1d24;
+  color: #fff;
+}
+.btn-sombre:hover {
+  background: #000;
+}
+.btn-clair {
+  background: rgba(255, 255, 255, 0.85);
+  color: #2b1d24;
+  border: 1px solid rgba(43, 29, 36, 0.12);
+}
+.btn-clair:hover {
+  border-color: rgba(146, 17, 79, 0.45);
+}
+.btn-blanc {
+  background: #fff;
+  color: #92114f;
+}
+
+/* Filtres : segments carres, pas de pastilles */
+.choix {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.25rem;
+  padding: 0 0.85rem;
+  border-radius: 0.6rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #5c4a53;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(43, 29, 36, 0.08);
+  transition: all 0.15s ease;
+}
+.choix:hover {
+  border-color: rgba(146, 17, 79, 0.35);
+}
+.choix[aria-pressed="true"] {
+  background: #2b1d24;
+  border-color: #2b1d24;
+  color: #fff;
+}
+.choix-doux[aria-pressed="true"] {
+  background: #92114f;
+  border-color: #92114f;
+  color: #fff;
+}
+
+.champ {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(43, 29, 36, 0.14);
+  background: rgba(255, 255, 255, 0.85);
+  font-size: 0.9rem;
+  color: #2b1d24;
+  outline: none;
+}
+.champ:focus {
+  border-color: #92114f;
+  box-shadow: 0 0 0 3px rgba(146, 17, 79, 0.12);
+}
+
+/* Jauge */
+.jauge {
+  height: 0.5rem;
+  border-radius: 999px;
+  background: rgba(43, 29, 36, 0.08);
+  overflow: hidden;
+}
+.jauge > i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Animations de la plante : douces, coupees si "reduire les animations" */
+.plante .balance {
+  transform-origin: 80px 106px;
+  animation: plante-balance 5.5s ease-in-out infinite;
+}
+.plante.soif .balance {
+  animation-duration: 9s;
+}
+.plante .feuille {
+  transform-box: fill-box;
+  transform-origin: 0 50%;
+  animation: plante-respire 4s ease-in-out infinite;
+}
+.plante .goutte {
+  animation: plante-goutte 3.8s ease-in infinite;
+}
+.plante .fleur {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: plante-fleur 6s ease-in-out infinite;
+}
+.plante.rebond .balance {
+  animation: plante-rebond 0.9s cubic-bezier(0.3, 1.6, 0.5, 1) 1, plante-balance 5.5s ease-in-out 0.9s infinite;
+}
+@keyframes plante-balance {
+  0%, 100% { transform: rotate(-1.6deg); }
+  50% { transform: rotate(1.8deg); }
+}
+@keyframes plante-respire {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.07); }
+}
+@keyframes plante-goutte {
+  0% { transform: translateY(-14px); opacity: 0; }
+  15% { opacity: 1; }
+  55% { transform: translateY(46px); opacity: 1; }
+  62%, 100% { transform: translateY(50px); opacity: 0; }
+}
+@keyframes plante-fleur {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+@keyframes plante-rebond {
+  0% { transform: scale(0.82); }
+  60% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+.apparition {
+  animation: apparition 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes apparition {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.etincelle {
+  animation: etincelle 2.4s ease-in-out infinite;
+}
+@keyframes etincelle {
+  0%, 100% { opacity: 0.25; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plante *, .apparition, .etincelle { animation: none !important; }
+}
+
+/* Barre de defilement horizontale discrete */
+.defile {
+  scrollbar-width: none;
+}
+.defile::-webkit-scrollbar {
+  display: none;
 }

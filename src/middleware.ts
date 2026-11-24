@@ -41,7 +41,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const zonesProtegees = ["/app", "/compte", "/admin"];
+  const zonesProtegees = ["/app", "/compte", "/admin", "/bienvenue"];
   const estProtege = zonesProtegees.some(
     (p) => pathname === p || pathname.startsWith(p + "/")
   );
@@ -84,6 +84,7 @@ export const config = {
     "/compte/:path*",
     "/admin",
     "/admin/:path*",
+    "/bienvenue",
     "/connexion",
   ],
 };

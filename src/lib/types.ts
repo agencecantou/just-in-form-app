@@ -12,6 +12,75 @@ export type Video = {
   vues: number;
   avec_materiel: boolean;
   zones_corps: string[];
+  /** 1 douce, 2 moderee, 3 intense (migration 011). */
+  intensite?: number | null;
+  objectifs?: string[] | null;
+  alerte_sante?: string | null;
+  created_at: string;
+};
+
+export const INTENSITES: Record<number, { label: string; couleur: string }> = {
+  1: { label: "Douce", couleur: "#3f8f63" },
+  2: { label: "Modérée", couleur: "#fab200" },
+  3: { label: "Intense", couleur: "#c23a73" },
+};
+
+export const OBJECTIFS_VIDEO = [
+  "Perte de poids",
+  "Tonification",
+  "Souplesse",
+  "Reprise en douceur",
+] as const;
+
+export type ProfilSante = {
+  objectif?: string;
+  temps?: number;
+  passe?: string;
+  douleurs?: string[];
+  enceinte?: boolean;
+  vigilance?: string[];
+  rappel?: string;
+  consentement?: boolean;
+};
+
+export type Recompense = {
+  id: string;
+  titre: string;
+  description: string;
+  seuil_gouttes: number;
+  lien_url: string | null;
+  image_url: string | null;
+  actif: boolean;
+  ordre: number;
+};
+
+export type Defi = {
+  id: string;
+  type: "mission" | "defi";
+  titre: string;
+  description: string;
+  mois: string;
+  categorie: string | null;
+  nombre: number;
+  gouttes: number;
+  actif: boolean;
+};
+
+export type ContenuNutrition = {
+  id: string;
+  type: "astuce" | "citation" | "conseil" | "recette" | "cours" | "ebook";
+  titre: string;
+  resume: string;
+  contenu: string;
+  image_url: string | null;
+  lien_url: string | null;
+  duree_min: number | null;
+  tags: string[];
+  prix_public: number | null;
+  prix_abonnee: number | null;
+  inclus: boolean;
+  ordre: number;
+  statut: "publie" | "brouillon";
   created_at: string;
 };
 
@@ -54,6 +123,13 @@ export type Profile = {
   prenom: string | null;
   role: "abonnee" | "coach";
   created_at: string;
+  photo_url?: string | null;
+  preferences?: Record<string, unknown> | null;
+  objectif_hebdo?: number | null;
+  profil_sante?: ProfilSante | null;
+  onboarding_fait?: boolean | null;
+  pause_depuis?: string | null;
+  pause_jusqu_au?: string | null;
 };
 
 export type Ressenti = {
@@ -76,7 +152,7 @@ export type Avis = {
 
 // 4 emojis de ressenti apres une seance, du plus dur au plus facile.
 export const RESSENTIS: Record<number, { emoji: string; label: string }> = {
-  1: { emoji: "🥵", label: "Tres dur" },
+  1: { emoji: "🥵", label: "Très dur" },
   2: { emoji: "😓", label: "Difficile" },
   3: { emoji: "🙂", label: "Normal" },
   4: { emoji: "😌", label: "Facile" },

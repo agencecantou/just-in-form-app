@@ -51,44 +51,57 @@ function FormulaireConnexion() {
   }
 
   return (
-    <div className="flex-1 flex items-center justify-center px-6 py-16">
+    <div className="flex-1 grid lg:grid-cols-[1.05fr_1fr] min-h-screen">
+      <div className="relative hidden lg:flex flex-col justify-end overflow-hidden bg-framboise p-12 text-white">
+        <div className="absolute -right-24 -top-24 h-[30rem] w-[30rem] rounded-full bg-jaune/30" />
+        <div className="absolute left-10 bottom-40 h-56 w-56 rounded-full bg-rose/20" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/images/justine-kick.webp" alt="Justine en séance de piloxing" className="absolute right-6 bottom-0 h-[78%] w-auto object-contain" />
+        <div className="relative max-w-sm">
+          <p className="titre-ecran text-[44px]">Ta salle de sport, à la maison.</p>
+          <p className="mt-4 text-white/85 font-medium leading-relaxed">
+            Plus de 100 séances avec Justine, des programmes guidés, la nutrition, et une plante qui grandit avec ta régularité.
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center justify-center px-6 py-16">
       <div className="w-full max-w-sm">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.png" alt="Just In Form" className="h-16 w-auto mx-auto mb-1" />
-        <p className="text-center text-anthracite/60 mb-8">
-          {mode === "connexion" ? "Content de te revoir" : "Cree ton compte"}
+        <img src="/logo.png" alt="Just In Form" className="h-16 w-auto mx-auto mb-3" />
+        <p className="text-center text-gris mb-8">
+          {mode === "connexion" ? "Content de te revoir" : "Crée ton compte"}
         </p>
 
-        <form onSubmit={valider} className="rounded-2xl bg-white border border-creme-dark p-6 space-y-4">
+        <form onSubmit={valider} className="verre rounded-2xl p-6 flex flex-col gap-4">
           {mode === "inscription" && (
             <div>
-              <label className="text-sm font-medium">Prenom</label>
+              <label className="text-sm font-semibold">Prénom</label>
               <input
                 value={prenom}
                 onChange={(e) => setPrenom(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-creme-dark px-3 py-2 text-sm"
+                className="champ mt-1.5"
               />
             </div>
           )}
           <div>
-            <label className="text-sm font-medium">Email</label>
+            <label className="text-sm font-semibold">Email</label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-creme-dark px-3 py-2 text-sm"
+              className="champ mt-1.5"
             />
           </div>
           <div>
-            <label className="text-sm font-medium">Mot de passe</label>
+            <label className="text-sm font-semibold">Mot de passe</label>
             <input
               type="password"
               required
               minLength={6}
               value={motDePasse}
               onChange={(e) => setMotDePasse(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-creme-dark px-3 py-2 text-sm"
+              className="champ mt-1.5"
             />
           </div>
 
@@ -97,17 +110,17 @@ function FormulaireConnexion() {
           <button
             type="submit"
             disabled={envoi}
-            className="w-full rounded-full bg-framboise text-white px-5 py-2.5 text-sm font-semibold disabled:opacity-50"
+            className="btn btn-principal w-full"
           >
-            {mode === "connexion" ? "Se connecter" : "Creer mon compte"}
+            {mode === "connexion" ? "Se connecter" : "Créer mon compte"}
           </button>
 
           {mode === "connexion" && (
             <Link
               href="/mot-de-passe-oublie"
-              className="block text-center text-xs text-anthracite/50 underline"
+              className="block text-center text-[13px] font-semibold text-gris hover:text-framboise"
             >
-              Mot de passe oublie ?
+              Mot de passe oublié ?
             </Link>
           )}
         </form>
@@ -117,10 +130,11 @@ function FormulaireConnexion() {
             setErreur(null);
             setMode(mode === "connexion" ? "inscription" : "connexion");
           }}
-          className="mt-4 w-full text-center text-sm text-anthracite/60 underline"
+          className="mt-5 w-full text-center text-sm font-semibold text-framboise"
         >
-          {mode === "connexion" ? "Pas encore de compte ? Inscris-toi" : "Deja un compte ? Connecte-toi"}
+          {mode === "connexion" ? "Pas encore de compte ? Inscris-toi" : "Déjà un compte ? Connecte-toi"}
         </button>
+      </div>
       </div>
     </div>
   );

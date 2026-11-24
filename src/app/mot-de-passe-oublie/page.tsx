@@ -30,31 +30,31 @@ export default function MotDePasseOubliePage() {
     <div className="flex-1 flex items-center justify-center px-6 py-16">
       <div className="w-full max-w-sm">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.png" alt="Just In Form" className="h-16 w-auto mx-auto mb-1" />
-        <p className="text-center text-anthracite/60 mb-8">
+        <img src="/logo.png" alt="Just In Form" className="h-16 w-auto mx-auto mb-3" />
+        <p className="text-center text-gris mb-8">
           Mot de passe oublie
         </p>
 
         {envoye ? (
-          <div className="rounded-2xl bg-white border border-creme-dark p-6 space-y-3 text-center">
+          <div className="verre rounded-2xl p-6 space-y-3 text-center">
             <p className="text-sm">
               Si un compte existe pour <strong>{email}</strong>, un email avec
               un lien de reinitialisation vient de t&apos;etre envoye.
             </p>
-            <p className="text-xs text-anthracite/50">
+            <p className="text-xs text-gris">
               Pense a verifier tes spams si tu ne le vois pas passer.
             </p>
           </div>
         ) : (
-          <form onSubmit={valider} className="rounded-2xl bg-white border border-creme-dark p-6 space-y-4">
+          <form onSubmit={valider} className="verre rounded-2xl p-6 space-y-4">
             <div>
-              <label className="text-sm font-medium">Email</label>
+              <label className="text-sm font-semibold">Email</label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-creme-dark px-3 py-2 text-sm"
+                className="champ mt-1.5"
               />
             </div>
 
@@ -63,7 +63,7 @@ export default function MotDePasseOubliePage() {
             <button
               type="submit"
               disabled={envoi}
-              className="w-full rounded-full bg-framboise text-white px-5 py-2.5 text-sm font-semibold disabled:opacity-50"
+              className="btn btn-principal w-full"
             >
               Envoyer le lien de reinitialisation
             </button>
@@ -72,7 +72,7 @@ export default function MotDePasseOubliePage() {
 
         <Link
           href="/connexion"
-          className="mt-4 block text-center text-sm text-anthracite/60 underline"
+          className="mt-5 block text-center text-sm font-semibold text-framboise"
         >
           Retour a la connexion
         </Link>
